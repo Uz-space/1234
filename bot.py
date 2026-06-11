@@ -357,6 +357,7 @@ API_STATE = {"connected": False, "domain": "sctg.xyz", "plan": "Trial", "account
 LIVE_LOG = {"crane_emoji": "", "crane_name": "", "log_text": ""}
 USER_SETTINGS = {}
 BOT_USERNAME = ""
+PENDING_DEPOSITS = {}
 
 class AddAccount(StatesGroup):
     email = State()
@@ -798,6 +799,7 @@ async def cb_submit_txid(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
     await state.set_state(DepositState.amount)
+    PENDING_DEPOSITS[user_id] = {"step": "amount", "amount": None}
     await call.message.answer(
         text=get_text(user_id, "enter_amount"),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
@@ -806,9 +808,12 @@ async def cb_submit_txid(call: CallbackQuery, state: FSMContext):
         parse_mode="HTML"
     )
 
-@dp.message(DepositState.amount, F.text)
+@dp.message(DepositState.amount)
 async def fsm_deposit_amount(message: Message, state: FSMContext):
     user_id = message.from_user.id
+    if not message.text:
+        await message.answer(get_text(user_id, "invalid_amount"))
+        return
     try:
         amount = float(message.text.strip().replace(",", "."))
         if amount < 0.1 or amount > 100:
@@ -816,7 +821,7 @@ async def fsm_deposit_amount(message: Message, state: FSMContext):
     except Exception:
         await message.answer(get_text(user_id, "invalid_amount"))
         return
-    await state.update_data(amount=amount)
+    PENDING_DEPOSITS[user_id] = {"step": "photo", "amount": amount}
     await state.set_state(DepositState.txid)
     await message.answer(
         text=get_text(user_id, "enter_txid"),
@@ -826,45 +831,52 @@ async def fsm_deposit_amount(message: Message, state: FSMContext):
         parse_mode="HTML"
     )
 
-@dp.message(DepositState.amount, ~F.text)
-async def fsm_deposit_amount_wrong(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    await message.answer(get_text(user_id, "invalid_amount"))
-
-@dp.message(DepositState.txid, F.photo)
+@dp.message(DepositState.txid)
 async def fsm_deposit_photo(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    data = await state.get_data()
-    amount = data.get("amount")
 
-    logging.info(f"[DEPOSIT] user={user_id} amount={amount} photo received")
+    if not message.photo:
+        await message.answer(get_text(user_id, "only_photo"))
+        return
+
+    pending = PENDING_DEPOSITS.get(user_id)
+    amount = pending.get("amount") if pending else None
+
+    logging.info(f"[DEPOSIT] user={user_id} amount={amount} photo={message.photo[-1].file_id}")
 
     if not amount:
         await state.clear()
-        await message.answer("❌ Miqdor topilmadi. Qaytadan /start bosing.")
+        PENDING_DEPOSITS.pop(user_id, None)
+        await message.answer("❌ Miqdor topilmadi. Qaytadan boshlang.")
         return
 
     file_id = message.photo[-1].file_id
     await state.clear()
+    PENDING_DEPOSITS.pop(user_id, None)
 
-    caption = get_text(ADMIN_ID, "deposit_request", user_id=user_id, amount=amount, txid="📸 Screenshot")
+    caption = (
+        f"💸 Yangi to'lov so'rovi!\n"
+        f"👤 User ID: <code>{user_id}</code>\n"
+        f"💰 Miqdor: <b>${amount}</b>"
+    )
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text=get_text(ADMIN_ID, "approve"), callback_data=f"approve_deposit_{user_id}_{amount}"),
-        InlineKeyboardButton(text=get_text(ADMIN_ID, "reject"), callback_data=f"reject_deposit_{user_id}")
+        InlineKeyboardButton(text="✅ Tasdiqlash", callback_data=f"approve_deposit_{user_id}_{amount}"),
+        InlineKeyboardButton(text="❌ Rad etish", callback_data=f"reject_deposit_{user_id}")
     ]])
 
     try:
-        await bot.send_photo(chat_id=ADMIN_ID, photo=file_id, caption=caption, reply_markup=keyboard, parse_mode="HTML")
-        logging.info(f"[DEPOSIT] Photo sent to admin {ADMIN_ID}")
+        await bot.send_photo(
+            chat_id=ADMIN_ID,
+            photo=file_id,
+            caption=caption,
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+        logging.info(f"[DEPOSIT] Sent to admin OK")
         await message.answer(get_text(user_id, "txid_received"))
     except Exception as e:
         logging.error(f"[DEPOSIT ERROR] {e}")
-        await message.answer(f"❌ Admin ga yuborishda xatolik: {e}")
-
-@dp.message(DepositState.txid, ~F.photo)
-async def fsm_deposit_not_photo(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    await message.answer(get_text(user_id, "only_photo"))
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
 
 @dp.callback_query(F.data == "cancel_deposit")
 async def cb_cancel_deposit(call: CallbackQuery, state: FSMContext):
