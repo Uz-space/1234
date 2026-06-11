@@ -9,7 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 logging.basicConfig(level=logging.INFO)
 
-BOT_TOKEN = "8565430862:AAFjLLyuK2peW_AAQactpVOI5LyeFSpY4XM"
+BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
 ADMIN_ID = 123456789  # O‘z Telegram ID ingizni yozing
 
 # ─── Til tarjimalari (to‘liq) ────────────────────────────────────────────────
@@ -60,13 +60,11 @@ TEXTS = {
         "trx": "🔴 TRX (TRC-20)",
         "doge": "🐕 DOGE",
         "wallet_address": "📍 Wallet Address:",
-        "amounts": "💰 Amounts:",
-        "monthly_amount": "• Monthly — $15",
-        "pack_amount": "• Claim Pack — $1",
-        "send_exact": "⚠️ Send exactly the amount",
+        "amounts": "💰 Deposit any amount ($0.1 – $100 USD):",
+        "send_exact": "⚠️ Send exactly the amount you entered",
         "submit_txid": "📝 After payment, tap Submit TXID",
         "submit_txid_button": "📝 Submit TXID",
-        "enter_amount": "💰 Enter the amount in USD (e.g., 15 or 1):",
+        "enter_amount": "💰 Enter the amount in USD (min $0.1, max $100):",
         "enter_txid": "📝 Now send the TXID (transaction hash):",
         "deposit_request": "💸 Deposit request from user {user_id}\nAmount: ${amount}\nTXID: <code>{txid}</code>",
         "approve": "✅ Approve",
@@ -115,7 +113,7 @@ TEXTS = {
         "add_spent_usage": "Admin: /add_spent <user_id> <amount>",
         "balance_updated": "✅ Balance updated for user {user_id}: +${amount}, new balance: ${balance}",
         "spent_updated": "✅ Spent updated for user {user_id}: +${amount}, new spent: ${spent}",
-        "invalid_amount": "❌ Invalid amount.",
+        "invalid_amount": "❌ Invalid amount. Please enter a number between 0.1 and 100.",
         "user_not_found": "❌ User not found.",
         "admin_only": "❌ Admin command only.",
     },
@@ -165,13 +163,11 @@ TEXTS = {
         "trx": "🔴 TRX (TRC-20)",
         "doge": "🐕 DOGE",
         "wallet_address": "📍 Hamyon manzili:",
-        "amounts": "💰 Miqdorlar:",
-        "monthly_amount": "• Oylik — $15",
-        "pack_amount": "• Claim paketi — $1",
-        "send_exact": "⚠️ Aynan shu miqdorni yuboring",
+        "amounts": "💰 Istalgan miqdorni kiriting ($0.1 – $100 USD):",
+        "send_exact": "⚠️ Aynan kiritgan miqdorni yuboring",
         "submit_txid": "📝 To‘lovdan so‘ng TXID yuboring",
         "submit_txid_button": "📝 TXID yuborish",
-        "enter_amount": "💰 USD miqdorini kiriting (masalan, 15 yoki 1):",
+        "enter_amount": "💰 USD miqdorini kiriting (min $0.1, max $100):",
         "enter_txid": "📝 Endi TXID (tranzaksiya hash) ni yuboring:",
         "deposit_request": "💸 {user_id} foydalanuvchidan to‘lov so‘rovi\nMiqdor: ${amount}\nTXID: <code>{txid}</code>",
         "approve": "✅ Tasdiqlash",
@@ -220,7 +216,7 @@ TEXTS = {
         "add_spent_usage": "Admin: /add_spent <user_id> <amount>",
         "balance_updated": "✅ {user_id} foydalanuvchi balansi +${amount}, yangi balans: ${balance}",
         "spent_updated": "✅ {user_id} foydalanuvchi sarfi +${amount}, yangi sarf: ${spent}",
-        "invalid_amount": "❌ Noto‘g‘ri miqdor.",
+        "invalid_amount": "❌ Noto‘g‘ri miqdor. Iltimos 0.1 va 100 orasida son kiriting.",
         "user_not_found": "❌ Foydalanuvchi topilmadi.",
         "admin_only": "❌ Faqat admin buyrug‘i.",
     },
@@ -270,13 +266,11 @@ TEXTS = {
         "trx": "🔴 TRX (TRC-20)",
         "doge": "🐕 DOGE",
         "wallet_address": "📍 Адрес кошелька:",
-        "amounts": "💰 Суммы:",
-        "monthly_amount": "• Месячный — $15",
-        "pack_amount": "• Пакет клеймов — $1",
-        "send_exact": "⚠️ Отправьте точную сумму",
+        "amounts": "💰 Введите любую сумму ($0.1 – $100 USD):",
+        "send_exact": "⚠️ Отправьте точно введённую сумму",
         "submit_txid": "📝 После оплаты нажмите Submit TXID",
         "submit_txid_button": "📝 Отправить TXID",
-        "enter_amount": "💰 Введите сумму в USD (например, 15 или 1):",
+        "enter_amount": "💰 Введите сумму в USD (мин $0.1, макс $100):",
         "enter_txid": "📝 Теперь отправьте TXID (хэш транзакции):",
         "deposit_request": "💸 Запрос пополнения от пользователя {user_id}\nСумма: ${amount}\nTXID: <code>{txid}</code>",
         "approve": "✅ Подтвердить",
@@ -325,7 +319,7 @@ TEXTS = {
         "add_spent_usage": "Admin: /add_spent <user_id> <amount>",
         "balance_updated": "✅ Баланс пользователя {user_id} +${amount}, новый баланс: ${balance}",
         "spent_updated": "✅ Расход пользователя {user_id} +${amount}, новый расход: ${spent}",
-        "invalid_amount": "❌ Неверная сумма.",
+        "invalid_amount": "❌ Неверная сумма. Введите число от 0.1 до 100.",
         "user_not_found": "❌ Пользователь не найден.",
         "admin_only": "❌ Только для администратора.",
     }
@@ -734,7 +728,8 @@ async def cb_pay_coin(call: CallbackQuery):
     coin_name = coin_map.get(coin_key, coin_key.upper())
     wallets = {"bnb": "0x...BNB_ADDRESS_HERE...", "sol": "...SOL_ADDRESS_HERE...", "ltc": "...LTC_ADDRESS_HERE...", "ton": "...TON_ADDRESS_HERE...", "trx": "TXiU2U73Ei9ewcMYu6H1eht5jDGBCUUu1F", "doge": "...DOGE_ADDRESS_HERE..."}
     address = wallets.get(coin_key, "Address not set")
-    text = f"{coin_name}\n\n{get_text(user_id, 'wallet_address')}\n<code>{address}</code>\n\n{get_text(user_id, 'amounts')}\n{get_text(user_id, 'monthly_amount')}\n{get_text(user_id, 'pack_amount')}\n\n{get_text(user_id, 'send_exact')}\n{get_text(user_id, 'submit_txid')}"
+    # Remove fixed amounts, show free deposit range
+    text = f"{coin_name}\n\n{get_text(user_id, 'wallet_address')}\n<code>{address}</code>\n\n{get_text(user_id, 'amounts')}\n{get_text(user_id, 'send_exact')}\n{get_text(user_id, 'submit_txid')}"
     await call.message.delete()
     await call.message.answer(text=text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "submit_txid_button"), callback_data="submit_txid")], [InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="pay_crypto")]]), parse_mode="HTML")
     await call.answer()
@@ -752,7 +747,8 @@ async def fsm_deposit_amount(message: Message, state: FSMContext):
     user_id = message.from_user.id
     try:
         amount = float(message.text.strip())
-        if amount <= 0: raise ValueError
+        if amount < 0.1 or amount > 100:
+            raise ValueError
     except:
         await message.answer(get_text(user_id, "invalid_amount"))
         return
