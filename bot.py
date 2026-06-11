@@ -9,7 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 logging.basicConfig(level=logging.INFO)
 
-BOT_TOKEN = "8565430862:AAFjLLyuK2peW_AAQactpVOI5LyeFSpY4XM"
+BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
 
 # ─── Kran konfiguratsiyasi ───────────────────────────────────────────────────
 CRANES = [
@@ -71,14 +71,14 @@ def cancel_keyboard():
 
 def skip_cookies_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ Cancel",       callback_data="cancel_add")],
+        [InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_add")],
         [InlineKeyboardButton(text="⏭️ Skip Cookies", callback_data="skip_cookies")],
     ])
 
 
 def skip_ua_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ Cancel",  callback_data="cancel_add")],
+        [InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_add")],
         [InlineKeyboardButton(text="⏭️ Skip UA", callback_data="skip_ua")],
     ])
 
@@ -134,13 +134,13 @@ def build_keyboard() -> InlineKeyboardMarkup:
     if row:
         buttons.append(row)
 
-    buttons.append([InlineKeyboardButton(text="🌐 Proxies",        callback_data="proxies")])
+    buttons.append([InlineKeyboardButton(text="🌐 Proxies", callback_data="proxies")])
     buttons.append([InlineKeyboardButton(text="📊 Stats & Balance", callback_data="stats")])
-    buttons.append([InlineKeyboardButton(text="💳 Subscription",    callback_data="subscription")])
-    buttons.append([InlineKeyboardButton(text="🎁 Invite Friend",   callback_data="invite")])
+    buttons.append([InlineKeyboardButton(text="💳 Subscription", callback_data="subscription")])
+    buttons.append([InlineKeyboardButton(text="🎁 Invite Friend", callback_data="invite")])
     buttons.append([
         InlineKeyboardButton(text="⚙️ Settings", callback_data="settings"),
-        InlineKeyboardButton(text="🔄",            callback_data="refresh"),
+        InlineKeyboardButton(text="🔄", callback_data="refresh"),
     ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -148,7 +148,7 @@ def build_keyboard() -> InlineKeyboardMarkup:
 def build_crane_keyboard(crane_name: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="➕ Add Account", callback_data=f"add_account_{crane_name}")],
-        [InlineKeyboardButton(text="◀️ Back",        callback_data="back_main")],
+        [InlineKeyboardButton(text="◀️ Back", callback_data="back_main")],
     ])
 
 
@@ -201,7 +201,7 @@ def build_settings_keyboard() -> InlineKeyboardMarkup:
 
 # ─── Bot va Dispatcher ───────────────────────────────────────────────────────
 bot = Bot(token=BOT_TOKEN)
-dp  = Dispatcher(storage=MemoryStorage())
+dp = Dispatcher(storage=MemoryStorage())
 
 
 # ─── /start ──────────────────────────────────────────────────────────────────
@@ -290,7 +290,7 @@ async def cb_add_account(call: CallbackQuery, state: FSMContext):
         return
 
     acc_num = len(crane["accounts"]) + 1
-    label   = f"Account {acc_num}"
+    label = f"Account {acc_num}"
 
     await state.set_state(AddAccount.email)
     await state.update_data(crane_name=crane_name, label=label)
@@ -397,13 +397,13 @@ async def fsm_ua(message: Message, state: FSMContext):
 
 # ─── Finish ──────────────────────────────────────────────────────────────────
 async def _finish_add_account(message: Message, state: FSMContext):
-    data       = await state.get_data()
+    data = await state.get_data()
     crane_name = data["crane_name"]
-    label      = data["label"]
-    email      = data["email"]
-    password   = data["password"]
-    cookies    = data.get("cookies")
-    ua         = data.get("ua")
+    label = data["label"]
+    email = data["email"]
+    password = data["password"]
+    cookies = data.get("cookies")
+    ua = data.get("ua")
 
     crane = get_crane(crane_name)
     if crane is None:
@@ -411,12 +411,12 @@ async def _finish_add_account(message: Message, state: FSMContext):
         return
 
     crane["accounts"].append({
-        "label":    label,
-        "email":    email,
+        "label": label,
+        "email": email,
         "password": password,
-        "cookies":  cookies,
-        "ua":       ua,
-        "active":   True,
+        "cookies": cookies,
+        "ua": ua,
+        "active": True,
     })
     crane["active"] = True
 
@@ -433,7 +433,7 @@ async def _finish_add_account(message: Message, state: FSMContext):
         ),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text=f"◀️ {crane_name}", callback_data=f"crane_{crane_name}")],
-            [InlineKeyboardButton(text="🏠 Main Menu",     callback_data="back_main")],
+            [InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_main")],
         ]),
         parse_mode="HTML"
     )
@@ -542,7 +542,7 @@ async def fsm_api_key(message: Message, state: FSMContext):
 
 @dp.message(SettingsState.api_host)
 async def fsm_api_host(message: Message, state: FSMContext):
-    user_id  = message.from_user.id
+    user_id = message.from_user.id
     api_host = message.text.strip()
     if user_id not in USER_SETTINGS:
         USER_SETTINGS[user_id] = {}
@@ -571,13 +571,208 @@ async def cb_stats(call: CallbackQuery):
 # ─── Subscription ────────────────────────────────────────────────────────────
 @dp.callback_query(F.data == "subscription")
 async def cb_subscription(call: CallbackQuery):
-    await call.answer("💳 Subscription (coming soon...)", show_alert=False)
+    text = (
+        "💳 <b>Subscription</b>\n\n"
+        "❌ No active subscription\n\n"
+        "📊 Accounts: 0\n"
+        "📊 Claims: 0\n\n"
+        "✅ <b>Available plans:</b>\n\n"
+        "📆 <b>Monthly</b> – $15/month\n"
+        "├ 50 accounts (any site)\n"
+        "└ Unlimited claims\n\n"
+        "🎫 <b>Claim Pack</b> – $1/1200 claims\n"
+        "├ Unlimited accounts\n"
+        "└ 1200 claims per pack\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    )
+
+    await call.message.delete()
+    await call.message.answer(
+        text=text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="💎 Pay with Crypto", callback_data="pay_crypto")],
+            [InlineKeyboardButton(text="◀️ Back", callback_data="back_main")],
+        ]),
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+
+# ─── Pay with Crypto ─────────────────────────────────────────────────────────
+@dp.callback_query(F.data == "pay_crypto")
+async def cb_pay_crypto(call: CallbackQuery):
+    text = "💎 <b>Select Cryptocurrency</b>\n\nChoose your preferred coin:"
+
+    await call.message.delete()
+    await call.message.answer(
+        text=text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🟡 BNB (BEP-20)", callback_data="pay_bnb")],
+            [InlineKeyboardButton(text="🟠 SOL", callback_data="pay_sol")],
+            [InlineKeyboardButton(text="⚪ LTC", callback_data="pay_ltc")],
+            [InlineKeyboardButton(text="💎 TON", callback_data="pay_ton")],
+            [InlineKeyboardButton(text="🔴 TRX (TRC-20)", callback_data="pay_trx")],
+            [InlineKeyboardButton(text="🐕 DOGE", callback_data="pay_doge")],
+            [InlineKeyboardButton(text="◀️ Back", callback_data="subscription")],
+        ]),
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+
+@dp.callback_query(F.data == "pay_bnb")
+async def cb_pay_bnb(call: CallbackQuery):
+    text = (
+        "🟡 <b>BNB (BEP-20)</b>\n\n"
+        "📍 <b>Wallet Address:</b>\n"
+        "<code>0x...BNB_ADDRESS_HERE...</code>\n\n"
+        "💰 <b>Amounts:</b>\n"
+        "• Monthly — $15\n"
+        "• Claim Pack — $1\n\n"
+        "⚠️ Send exactly the amount\n"
+        "📝 After payment, tap Submit TXID"
+    )
+    await call.message.delete()
+    await call.message.answer(
+        text=text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📝 Submit TXID", callback_data="submit_txid")],
+            [InlineKeyboardButton(text="◀️ Back", callback_data="pay_crypto")],
+        ]),
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+
+@dp.callback_query(F.data == "pay_sol")
+async def cb_pay_sol(call: CallbackQuery):
+    text = (
+        "🟠 <b>SOL</b>\n\n"
+        "📍 <b>Wallet Address:</b>\n"
+        "<code>...SOL_ADDRESS_HERE...</code>\n\n"
+        "💰 <b>Amounts:</b>\n"
+        "• Monthly — $15\n"
+        "• Claim Pack — $1\n\n"
+        "⚠️ Send exactly the amount\n"
+        "📝 After payment, tap Submit TXID"
+    )
+    await call.message.delete()
+    await call.message.answer(
+        text=text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📝 Submit TXID", callback_data="submit_txid")],
+            [InlineKeyboardButton(text="◀️ Back", callback_data="pay_crypto")],
+        ]),
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+
+@dp.callback_query(F.data == "pay_ltc")
+async def cb_pay_ltc(call: CallbackQuery):
+    text = (
+        "⚪ <b>LTC</b>\n\n"
+        "📍 <b>Wallet Address:</b>\n"
+        "<code>...LTC_ADDRESS_HERE...</code>\n\n"
+        "💰 <b>Amounts:</b>\n"
+        "• Monthly — $15\n"
+        "• Claim Pack — $1\n\n"
+        "⚠️ Send exactly the amount\n"
+        "📝 After payment, tap Submit TXID"
+    )
+    await call.message.delete()
+    await call.message.answer(
+        text=text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📝 Submit TXID", callback_data="submit_txid")],
+            [InlineKeyboardButton(text="◀️ Back", callback_data="pay_crypto")],
+        ]),
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+
+@dp.callback_query(F.data == "pay_ton")
+async def cb_pay_ton(call: CallbackQuery):
+    text = (
+        "💎 <b>TON</b>\n\n"
+        "📍 <b>Wallet Address:</b>\n"
+        "<code>...TON_ADDRESS_HERE...</code>\n\n"
+        "💰 <b>Amounts:</b>\n"
+        "• Monthly — $15\n"
+        "• Claim Pack — $1\n\n"
+        "⚠️ Send exactly the amount\n"
+        "📝 After payment, tap Submit TXID"
+    )
+    await call.message.delete()
+    await call.message.answer(
+        text=text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📝 Submit TXID", callback_data="submit_txid")],
+            [InlineKeyboardButton(text="◀️ Back", callback_data="pay_crypto")],
+        ]),
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+
+@dp.callback_query(F.data == "pay_trx")
+async def cb_pay_trx(call: CallbackQuery):
+    text = (
+        "🔴 <b>TRX (TRC-20)</b>\n\n"
+        "📍 <b>Wallet Address:</b>\n"
+        "<code>TXiU2U73Ei9ewcMYu6H1eht5jDGBCUUu1F</code>\n\n"
+        "💰 <b>Amounts:</b>\n"
+        "• Monthly — $15\n"
+        "• Claim Pack — $1\n\n"
+        "⚠️ Send exactly the amount\n"
+        "📝 After payment, tap Submit TXID"
+    )
+    await call.message.delete()
+    await call.message.answer(
+        text=text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📝 Submit TXID", callback_data="submit_txid")],
+            [InlineKeyboardButton(text="◀️ Back", callback_data="pay_crypto")],
+        ]),
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+
+@dp.callback_query(F.data == "pay_doge")
+async def cb_pay_doge(call: CallbackQuery):
+    text = (
+        "🐕 <b>DOGE</b>\n\n"
+        "📍 <b>Wallet Address:</b>\n"
+        "<code>...DOGE_ADDRESS_HERE...</code>\n\n"
+        "💰 <b>Amounts:</b>\n"
+        "• Monthly — $15\n"
+        "• Claim Pack — $1\n\n"
+        "⚠️ Send exactly the amount\n"
+        "📝 After payment, tap Submit TXID"
+    )
+    await call.message.delete()
+    await call.message.answer(
+        text=text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📝 Submit TXID", callback_data="submit_txid")],
+            [InlineKeyboardButton(text="◀️ Back", callback_data="pay_crypto")],
+        ]),
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+
+@dp.callback_query(F.data == "submit_txid")
+async def cb_submit_txid(call: CallbackQuery):
+    await call.answer("📝 Send your TXID in chat...", show_alert=True)
 
 
 # ─── Invite Friend ───────────────────────────────────────────────────────────
 @dp.callback_query(F.data == "invite")
 async def cb_invite(call: CallbackQuery):
-    user     = call.from_user
+    user = call.from_user
     ref_code = f"ref_{user.id}"
     ref_link = f"https://t.me/{BOT_USERNAME}?start={ref_code}"
 
