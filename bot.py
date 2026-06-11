@@ -9,8 +9,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 logging.basicConfig(level=logging.INFO)
 
-BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
-ADMIN_ID = 123456789  # O‘z Telegram ID ingizni yozing
+BOT_TOKEN = "8565430862:AAFjLLyuK2peW_AAQactpVOI5LyeFSpY4XM"
+ADMIN_ID = 7399101034  # O‘z Telegram ID ingizni yozing
 
 # ─── Til tarjimalari (to‘liq) ────────────────────────────────────────────────
 TEXTS = {
