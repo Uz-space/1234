@@ -29,7 +29,7 @@ CRANES = [
 
 API_STATE = {"connected": False, "domain": "sctg.xyz", "plan": "Trial", "accounts": 0, "total_claims": 0}
 LIVE_LOG = {"crane_emoji": "", "crane_name": "", "log_text": ""}
-USER_SETTINGS = {}  # user_id: {language, balance, total_deposited, total_spent, api_key, api_host, referrals: [], referral_bonus: 0}
+USER_SETTINGS = {}
 BOT_USERNAME = ""
 
 # ─── FSM States ──────────────────────────────────────────────────────────────
@@ -124,7 +124,6 @@ dp = Dispatcher(storage=MemoryStorage())
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     user_id = message.from_user.id
-    # Referal logikasi
     args = message.text.split()
     referrer_id = None
     if len(args) > 1 and args[1].startswith("ref_"):
@@ -142,18 +141,12 @@ async def cmd_start(message: Message, state: FSMContext):
             "referrals": [],
             "referral_bonus": 0
         }
-        # Referal bo‘yicha bonus
         if referrer_id and referrer_id in USER_SETTINGS and referrer_id != user_id:
-            # Taklif qiluvchiga +16 claims (claim = $0.01 => $0.16)
             USER_SETTINGS[referrer_id]["balance"] = USER_SETTINGS[referrer_id].get("balance", 0.0) + 0.16
             USER_SETTINGS[referrer_id]["referral_bonus"] = USER_SETTINGS[referrer_id].get("referral_bonus", 0) + 16
-            if "referrals" not in USER_SETTINGS[referrer_id]:
-                USER_SETTINGS[referrer_id]["referrals"] = []
             USER_SETTINGS[referrer_id]["referrals"].append(user_id)
-            # Yangi foydalanuvchiga +8 claims
             USER_SETTINGS[user_id]["balance"] = USER_SETTINGS[user_id].get("balance", 0.0) + 0.08
             USER_SETTINGS[user_id]["referral_bonus"] = USER_SETTINGS[user_id].get("referral_bonus", 0) + 8
-            # Xabarlar
             await bot.send_message(referrer_id, get_text(referrer_id, "referee_bonus"))
             await message.answer(get_text(user_id, "referral_bonus", ref_id=referrer_id))
 
@@ -486,7 +479,7 @@ async def fsm_deposit_amount(message: Message, state: FSMContext):
 async def fsm_deposit_photo(message: Message, state: FSMContext):
     user_id = message.from_user.id
     if not message.photo:
-        await message.answer("❌ Iltimos, to‘lov skrinshotini rasm sifatida yuboring.")
+        await message.answer(get_text(user_id, "only_photo"))
         return
 
     photo = message.photo[-1]
