@@ -10,7 +10,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = "8565430862:AAFjLLyuK2peW_AAQactpVOI5LyeFSpY4XM"
-ADMIN_ID = 7399101034  # O‘z Telegram ID ingizni yozing
+ADMIN_ID = 7399101034
 
 # ─── Til tarjimalari (to‘liq) ────────────────────────────────────────────────
 TEXTS = {
@@ -62,16 +62,16 @@ TEXTS = {
         "wallet_address": "📍 Wallet Address:",
         "amounts": "💰 Deposit any amount ($0.1 – $100 USD):",
         "send_exact": "⚠️ Send exactly the amount you entered",
-        "submit_txid": "📝 After payment, tap Submit TXID",
-        "submit_txid_button": "📝 Submit TXID",
+        "submit_txid": "📝 After payment, tap Submit Screenshot",
+        "submit_txid_button": "📸 Submit Screenshot",
         "enter_amount": "💰 Enter the amount in USD (min $0.1, max $100):",
-        "enter_txid": "📝 Now send the TXID (transaction hash):",
-        "deposit_request": "💸 Deposit request from user {user_id}\nAmount: ${amount}\nTXID: <code>{txid}</code>",
+        "enter_txid": "📸 Now send the payment screenshot:",
+        "deposit_request": "💸 Deposit request from user {user_id}\nAmount: ${amount}\nProof: {txid}",
         "approve": "✅ Approve",
         "reject": "❌ Reject",
         "deposit_approved": "✅ Your deposit of ${amount} has been approved! Balance updated.",
         "deposit_rejected": "❌ Your deposit request has been rejected. Please try again.",
-        "txid_received": "📝 TXID received! Admin will review and add balance.",
+        "txid_received": "📸 Screenshot received! Admin will review and add balance.",
         "cancel": "❌ Cancel",
         "skip_cookies": "⏭️ Skip Cookies",
         "skip_ua": "⏭️ Skip UA",
@@ -165,16 +165,16 @@ TEXTS = {
         "wallet_address": "📍 Hamyon manzili:",
         "amounts": "💰 Istalgan miqdorni kiriting ($0.1 – $100 USD):",
         "send_exact": "⚠️ Aynan kiritgan miqdorni yuboring",
-        "submit_txid": "📝 To‘lovdan so‘ng TXID yuboring",
-        "submit_txid_button": "📝 TXID yuborish",
+        "submit_txid": "📝 To‘lovdan so‘ng Screenshot yuboring",
+        "submit_txid_button": "📸 Screenshot yuborish",
         "enter_amount": "💰 USD miqdorini kiriting (min $0.1, max $100):",
-        "enter_txid": "📝 Endi TXID (tranzaksiya hash) ni yuboring:",
-        "deposit_request": "💸 {user_id} foydalanuvchidan to‘lov so‘rovi\nMiqdor: ${amount}\nTXID: <code>{txid}</code>",
+        "enter_txid": "📸 Endi to‘lov skrinshotini yuboring:",
+        "deposit_request": "💸 {user_id} foydalanuvchidan to‘lov so‘rovi\nMiqdor: ${amount}\nTasdiq: {txid}",
         "approve": "✅ Tasdiqlash",
         "reject": "❌ Rad etish",
         "deposit_approved": "✅ ${amount} miqdoridagi to‘lovingiz tasdiqlandi! Balans yangilandi.",
         "deposit_rejected": "❌ To‘lov so‘rovingiz rad etildi. Qaytadan urinib ko‘ring.",
-        "txid_received": "📝 TXID qabul qilindi! Admin tekshirib balansni oshiradi.",
+        "txid_received": "📸 Skrinshot qabul qilindi! Admin tekshirib balansni oshiradi.",
         "cancel": "❌ Bekor qilish",
         "skip_cookies": "⏭️ Cookies o‘tkazib yuborish",
         "skip_ua": "⏭️ UA o‘tkazib yuborish",
@@ -268,16 +268,16 @@ TEXTS = {
         "wallet_address": "📍 Адрес кошелька:",
         "amounts": "💰 Введите любую сумму ($0.1 – $100 USD):",
         "send_exact": "⚠️ Отправьте точно введённую сумму",
-        "submit_txid": "📝 После оплаты нажмите Submit TXID",
-        "submit_txid_button": "📝 Отправить TXID",
+        "submit_txid": "📝 После оплаты нажмите Отправить скриншот",
+        "submit_txid_button": "📸 Отправить скриншот",
         "enter_amount": "💰 Введите сумму в USD (мин $0.1, макс $100):",
-        "enter_txid": "📝 Теперь отправьте TXID (хэш транзакции):",
-        "deposit_request": "💸 Запрос пополнения от пользователя {user_id}\nСумма: ${amount}\nTXID: <code>{txid}</code>",
+        "enter_txid": "📸 Теперь отправьте скриншот оплаты:",
+        "deposit_request": "💸 Запрос пополнения от пользователя {user_id}\nСумма: ${amount}\nПодтверждение: {txid}",
         "approve": "✅ Подтвердить",
         "reject": "❌ Отклонить",
         "deposit_approved": "✅ Ваш депозит на сумму ${amount} подтверждён! Баланс обновлён.",
         "deposit_rejected": "❌ Ваш запрос отклонён. Попробуйте снова.",
-        "txid_received": "📝 TXID получен! Администратор проверит и пополнит баланс.",
+        "txid_received": "📸 Скриншот получен! Администратор проверит и пополнит баланс.",
         "cancel": "❌ Отмена",
         "skip_cookies": "⏭️ Пропустить Cookies",
         "skip_ua": "⏭️ Пропустить UA",
@@ -354,7 +354,7 @@ BOT_USERNAME = ""
 # ─── FSM States ──────────────────────────────────────────────────────────────
 class AddAccount(StatesGroup): email = State(); password = State(); cookies = State(); ua = State()
 class SettingsState(StatesGroup): api_key = State(); api_host = State()
-class DepositState(StatesGroup): amount = State(); txid = State()
+class DepositState(StatesGroup): amount = State(); txid = State()  # txid holati endi rasm uchun
 
 def get_crane(name: str): return next((c for c in CRANES if c["name"] == name), None)
 
@@ -524,7 +524,7 @@ async def cb_crane(call: CallbackQuery):
     await call.message.answer(text=crane_panel_text(crane, user_id), reply_markup=build_crane_keyboard(crane_name, user_id), parse_mode="HTML")
     await call.answer()
 
-# ─── Add account flow ────────────────────────────────────────────────────────
+# ─── Add account flow (unchanged) ────────────────────────────────────────────
 @dp.callback_query(F.data.startswith("add_account_"))
 async def cb_add_account(call: CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
@@ -703,7 +703,7 @@ async def cb_subscription(call: CallbackQuery):
     await call.message.answer(text=text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "pay_with_crypto"), callback_data="pay_crypto")], [InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="back_main")]]), parse_mode="HTML")
     await call.answer()
 
-# ─── Pay with Crypto (coin selection) ────────────────────────────────────────
+# ─── Pay with Crypto ─────────────────────────────────────────────────────────
 @dp.callback_query(F.data == "pay_crypto")
 async def cb_pay_crypto(call: CallbackQuery):
     user_id = call.from_user.id
@@ -728,18 +728,21 @@ async def cb_pay_coin(call: CallbackQuery):
     coin_name = coin_map.get(coin_key, coin_key.upper())
     wallets = {"bnb": "0x...BNB_ADDRESS_HERE...", "sol": "...SOL_ADDRESS_HERE...", "ltc": "...LTC_ADDRESS_HERE...", "ton": "...TON_ADDRESS_HERE...", "trx": "TXiU2U73Ei9ewcMYu6H1eht5jDGBCUUu1F", "doge": "...DOGE_ADDRESS_HERE..."}
     address = wallets.get(coin_key, "Address not set")
-    # Remove fixed amounts, show free deposit range
     text = f"{coin_name}\n\n{get_text(user_id, 'wallet_address')}\n<code>{address}</code>\n\n{get_text(user_id, 'amounts')}\n{get_text(user_id, 'send_exact')}\n{get_text(user_id, 'submit_txid')}"
     await call.message.delete()
     await call.message.answer(text=text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "submit_txid_button"), callback_data="submit_txid")], [InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="pay_crypto")]]), parse_mode="HTML")
     await call.answer()
 
-# ─── Submit TXID (deposit flow) ──────────────────────────────────────────────
+# ─── Submit Screenshot (deposit flow) ────────────────────────────────────────
 @dp.callback_query(F.data == "submit_txid")
 async def cb_submit_txid(call: CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
     await state.set_state(DepositState.amount)
-    await call.message.answer(text=get_text(user_id, "enter_amount"), reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_deposit")]]), parse_mode="HTML")
+    await call.message.answer(
+        text=get_text(user_id, "enter_amount"),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_deposit")]]),
+        parse_mode="HTML"
+    )
     await call.answer()
 
 @dp.message(DepositState.amount)
@@ -754,22 +757,33 @@ async def fsm_deposit_amount(message: Message, state: FSMContext):
         return
     await state.update_data(amount=amount)
     await state.set_state(DepositState.txid)
-    await message.answer(text=get_text(user_id, "enter_txid"), reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_deposit")]]), parse_mode="HTML")
+    await message.answer(
+        text=get_text(user_id, "enter_txid"),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_deposit")]]),
+        parse_mode="HTML"
+    )
 
-@dp.message(DepositState.txid)
-async def fsm_deposit_txid(message: Message, state: FSMContext):
+@dp.message(DepositState.txid, F.photo)
+async def fsm_deposit_photo(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    txid = message.text.strip()
+    photo = message.photo[-1]
+    file_id = photo.file_id
     data = await state.get_data()
     amount = data.get("amount")
     await state.clear()
 
+    caption = get_text(ADMIN_ID, "deposit_request", user_id=user_id, amount=amount, txid="📸 Screenshot")
     approve_btn = InlineKeyboardButton(text=get_text(ADMIN_ID, "approve"), callback_data=f"approve_deposit_{user_id}_{amount}")
     reject_btn = InlineKeyboardButton(text=get_text(ADMIN_ID, "reject"), callback_data=f"reject_deposit_{user_id}")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[approve_btn, reject_btn]])
 
-    await bot.send_message(ADMIN_ID, get_text(ADMIN_ID, "deposit_request", user_id=user_id, amount=amount, txid=txid), reply_markup=keyboard, parse_mode="HTML")
+    await bot.send_photo(ADMIN_ID, photo=file_id, caption=caption, reply_markup=keyboard, parse_mode="HTML")
     await message.answer(get_text(user_id, "txid_received"))
+
+@dp.message(DepositState.txid)
+async def fsm_deposit_invalid(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    await message.answer("❌ Please send a screenshot (photo) of your payment.")
 
 @dp.callback_query(F.data == "cancel_deposit")
 async def cb_cancel_deposit(call: CallbackQuery, state: FSMContext):
