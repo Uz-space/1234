@@ -9,7 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 logging.basicConfig(level=logging.INFO)
 
-BOT_TOKEN = "8565430862:AAFjLLyuK2peW_AAQactpVOI5LyeFSpY4XM"
+BOT_TOKEN = "8565430862:AAGehtqqTWqvLS-H4BH-LyUE6VfSbVJy698"
 ADMIN_ID = 7399101034 # O‘z Telegram ID ingizni yozing
 
 # ─── Til tarjimalari (to‘liq) ────────────────────────────────────────────────
