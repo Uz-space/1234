@@ -51,7 +51,7 @@ TEXTS = {
         "submit_txid": "📝 After payment, tap Submit Screenshot",
         "submit_txid_button": "📸 Submit Screenshot",
         "enter_amount": "💰 Enter the amount in USD (min $0.1, max $100):",
-        "enter_txid": "📸 Now send the payment screenshot:",
+        "enter_txid": "📸 Now send the payment screenshot (photo only):",
         "deposit_request": "💸 Deposit request from user {user_id}\nAmount: ${amount}\nProof: {txid}",
         "approve": "✅ Approve",
         "reject": "❌ Reject",
@@ -104,6 +104,7 @@ TEXTS = {
         "admin_only": "❌ Admin command only.",
         "referral_bonus": "🎉 You got +16 claims! Referred by user {ref_id}",
         "referee_bonus": "🎉 Your friend got +8 claims for joining via your link!",
+        "only_photo": "❌ Please send a PHOTO (screenshot) of your payment, not text.",
     },
     "uz": {
         "main_title": "RIPPERBOT",
@@ -156,7 +157,7 @@ TEXTS = {
         "submit_txid": "📝 To‘lovdan so‘ng Screenshot yuboring",
         "submit_txid_button": "📸 Screenshot yuborish",
         "enter_amount": "💰 USD miqdorini kiriting (min $0.1, max $100):",
-        "enter_txid": "📸 Endi to‘lov skrinshotini yuboring:",
+        "enter_txid": "📸 Endi to‘lov skrinshotini (faqat rasm) yuboring:",
         "deposit_request": "💸 {user_id} foydalanuvchidan to‘lov so‘rovi\nMiqdor: ${amount}\nTasdiq: {txid}",
         "approve": "✅ Tasdiqlash",
         "reject": "❌ Rad etish",
@@ -209,6 +210,7 @@ TEXTS = {
         "admin_only": "❌ Faqat admin buyrug‘i.",
         "referral_bonus": "🎉 Siz +16 claim oldingiz! Sizni {ref_id} taklif qildi.",
         "referee_bonus": "🎉 Do‘stingiz sizning link orqali kelib +8 claim oldi!",
+        "only_photo": "❌ Iltimos, to‘lov skrinshotini RASM sifatida yuboring, matn emas.",
     },
     "ru": {
         "main_title": "RIPPERBOT",
@@ -261,7 +263,7 @@ TEXTS = {
         "submit_txid": "📝 После оплаты нажмите Отправить скриншот",
         "submit_txid_button": "📸 Отправить скриншот",
         "enter_amount": "💰 Введите сумму в USD (мин $0.1, макс $100):",
-        "enter_txid": "📸 Теперь отправьте скриншот оплаты:",
+        "enter_txid": "📸 Теперь отправьте скриншот оплаты (только фото):",
         "deposit_request": "💸 Запрос пополнения от пользователя {user_id}\nСумма: ${amount}\nПодтверждение: {txid}",
         "approve": "✅ Подтвердить",
         "reject": "❌ Отклонить",
@@ -314,5 +316,6 @@ TEXTS = {
         "admin_only": "❌ Только для администратора.",
         "referral_bonus": "🎉 Вы получили +16 клеймов! Вас пригласил {ref_id}",
         "referee_bonus": "🎉 Ваш друг получил +8 клеймов за переход по вашей ссылке!",
+        "only_photo": "❌ Пожалуйста, отправьте ФОТО (скриншот) оплаты, а не текст.",
     }
 }
