@@ -10,7 +10,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = "8565430862:AAFjLLyuK2peW_AAQactpVOI5LyeFSpY4XM"
-ADMIN_ID = 7399101034
+ADMIN_ID = 7399101034 # O‘z Telegram ID ingizni yozing
 
 # ─── Til tarjimalari (to‘liq) ────────────────────────────────────────────────
 TEXTS = {
@@ -354,7 +354,7 @@ BOT_USERNAME = ""
 # ─── FSM States ──────────────────────────────────────────────────────────────
 class AddAccount(StatesGroup): email = State(); password = State(); cookies = State(); ua = State()
 class SettingsState(StatesGroup): api_key = State(); api_host = State()
-class DepositState(StatesGroup): amount = State(); txid = State()  # txid holati endi rasm uchun
+class DepositState(StatesGroup): amount = State(); txid = State()
 
 def get_crane(name: str): return next((c for c in CRANES if c["name"] == name), None)
 
@@ -524,7 +524,7 @@ async def cb_crane(call: CallbackQuery):
     await call.message.answer(text=crane_panel_text(crane, user_id), reply_markup=build_crane_keyboard(crane_name, user_id), parse_mode="HTML")
     await call.answer()
 
-# ─── Add account flow (unchanged) ────────────────────────────────────────────
+# ─── Add account flow ────────────────────────────────────────────────────────
 @dp.callback_query(F.data.startswith("add_account_"))
 async def cb_add_account(call: CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
@@ -763,27 +763,33 @@ async def fsm_deposit_amount(message: Message, state: FSMContext):
         parse_mode="HTML"
     )
 
-@dp.message(DepositState.txid, F.photo)
+@dp.message(DepositState.txid)
 async def fsm_deposit_photo(message: Message, state: FSMContext):
     user_id = message.from_user.id
+    if not message.photo:
+        await message.answer("❌ Iltimos, to‘lov skrinshotini rasm sifatida yuboring.")
+        return
+    
     photo = message.photo[-1]
     file_id = photo.file_id
     data = await state.get_data()
     amount = data.get("amount")
+    if not amount:
+        await state.clear()
+        await message.answer("❌ Xatolik yuz berdi. Iltimos, qaytadan /start bilan boshlang.")
+        return
     await state.clear()
-
+    
     caption = get_text(ADMIN_ID, "deposit_request", user_id=user_id, amount=amount, txid="📸 Screenshot")
     approve_btn = InlineKeyboardButton(text=get_text(ADMIN_ID, "approve"), callback_data=f"approve_deposit_{user_id}_{amount}")
     reject_btn = InlineKeyboardButton(text=get_text(ADMIN_ID, "reject"), callback_data=f"reject_deposit_{user_id}")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[approve_btn, reject_btn]])
-
-    await bot.send_photo(ADMIN_ID, photo=file_id, caption=caption, reply_markup=keyboard, parse_mode="HTML")
-    await message.answer(get_text(user_id, "txid_received"))
-
-@dp.message(DepositState.txid)
-async def fsm_deposit_invalid(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    await message.answer("❌ Please send a screenshot (photo) of your payment.")
+    
+    try:
+        await bot.send_photo(ADMIN_ID, photo=file_id, caption=caption, reply_markup=keyboard, parse_mode="HTML")
+        await message.answer(get_text(user_id, "txid_received"))
+    except Exception as e:
+        await message.answer(f"❌ Xatolik: {e}. Iltimos, keyinroq qaytadan urinib ko‘ring.")
 
 @dp.callback_query(F.data == "cancel_deposit")
 async def cb_cancel_deposit(call: CallbackQuery, state: FSMContext):
