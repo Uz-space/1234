@@ -795,58 +795,72 @@ async def cb_pay_coin(call: CallbackQuery):
 @dp.callback_query(F.data == "submit_txid")
 async def cb_submit_txid(call: CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
+    await call.answer()
+    await state.clear()
     await state.set_state(DepositState.amount)
     await call.message.answer(
         text=get_text(user_id, "enter_amount"),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_deposit")]]),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_deposit")
+        ]]),
         parse_mode="HTML"
     )
-    await call.answer()
 
-@dp.message(DepositState.amount)
+@dp.message(DepositState.amount, F.text)
 async def fsm_deposit_amount(message: Message, state: FSMContext):
     user_id = message.from_user.id
     try:
-        amount = float(message.text.strip())
+        amount = float(message.text.strip().replace(",", "."))
         if amount < 0.1 or amount > 100:
             raise ValueError
-    except:
+    except Exception:
         await message.answer(get_text(user_id, "invalid_amount"))
         return
     await state.update_data(amount=amount)
     await state.set_state(DepositState.txid)
     await message.answer(
         text=get_text(user_id, "enter_txid"),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_deposit")]]),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_deposit")
+        ]]),
         parse_mode="HTML"
     )
 
-# ✅ ASOSIY TUZATISH: ikkita alohida handler — foto va foto bo'lmagan
+@dp.message(DepositState.amount, ~F.text)
+async def fsm_deposit_amount_wrong(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    await message.answer(get_text(user_id, "invalid_amount"))
+
 @dp.message(DepositState.txid, F.photo)
 async def fsm_deposit_photo(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    photo = message.photo[-1]
-    file_id = photo.file_id
     data = await state.get_data()
     amount = data.get("amount")
+
+    logging.info(f"[DEPOSIT] user={user_id} amount={amount} photo received")
+
     if not amount:
         await state.clear()
-        await message.answer("❌ Xatolik yuz berdi. Iltimos, qaytadan /start bilan boshlang.")
+        await message.answer("❌ Miqdor topilmadi. Qaytadan /start bosing.")
         return
+
+    file_id = message.photo[-1].file_id
     await state.clear()
 
     caption = get_text(ADMIN_ID, "deposit_request", user_id=user_id, amount=amount, txid="📸 Screenshot")
-    approve_btn = InlineKeyboardButton(text=get_text(ADMIN_ID, "approve"), callback_data=f"approve_deposit_{user_id}_{amount}")
-    reject_btn = InlineKeyboardButton(text=get_text(ADMIN_ID, "reject"), callback_data=f"reject_deposit_{user_id}")
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[approve_btn, reject_btn]])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=get_text(ADMIN_ID, "approve"), callback_data=f"approve_deposit_{user_id}_{amount}"),
+        InlineKeyboardButton(text=get_text(ADMIN_ID, "reject"), callback_data=f"reject_deposit_{user_id}")
+    ]])
 
     try:
-        await bot.send_photo(ADMIN_ID, photo=file_id, caption=caption, reply_markup=keyboard, parse_mode="HTML")
+        await bot.send_photo(chat_id=ADMIN_ID, photo=file_id, caption=caption, reply_markup=keyboard, parse_mode="HTML")
+        logging.info(f"[DEPOSIT] Photo sent to admin {ADMIN_ID}")
         await message.answer(get_text(user_id, "txid_received"))
     except Exception as e:
-        await message.answer(f"❌ Xatolik: {e}. Iltimos, keyinroq qaytadan urinib ko'ring.")
+        logging.error(f"[DEPOSIT ERROR] {e}")
+        await message.answer(f"❌ Admin ga yuborishda xatolik: {e}")
 
-# ✅ Foto emas narsalar kelsa — xato xabar
 @dp.message(DepositState.txid, ~F.photo)
 async def fsm_deposit_not_photo(message: Message, state: FSMContext):
     user_id = message.from_user.id
