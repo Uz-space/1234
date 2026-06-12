@@ -4,8 +4,6 @@ import logging
 import json
 import os
 import re
-import aiohttp
-from http.cookies import SimpleCookie
 from typing import Optional, Dict, Any
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -13,6 +11,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
+from curl_cffi import requests as curl_requests
 
 logging.basicConfig(level=logging.INFO)
 BOT_TOKEN = "8565430862:AAEKjNqGjNKOpamnlqanPfJdUbmNY6Cu86k"
@@ -255,7 +254,8 @@ def cancel_keyboard(user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_add")]])
 
 def get_csrf_from_cookie(cookie_str: str) -> Optional[str]:
-    """Cookie string ichidan csrf_cookie_name qiymatini olish (PHP dagi getCsrf() ga o‘xshash)"""
+    if not cookie_str:
+        return None
     parts = cookie_str.split(';')
     for part in parts:
         part = part.strip()
@@ -346,7 +346,7 @@ def build_settings_keyboard(user_id: int):
         [InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="back_main")]
     ])
 
-# ========== CLAIMER (Xevil + HTTP) – to‘liq PHP logikasiga mos ==========
+# ========== CLAIMER (curl_cffi bilan, PHP dagi kabi to‘liq) ==========
 CRANE_CONFIG = {
     "TronPick": {
         "host": "https://tronpick.io/",
@@ -434,15 +434,15 @@ class XevilSolver:
         return await self._solve("userrecaptcha", sitekey=sitekey, pageurl=pageurl)
 
     async def _solve(self, method: str, **kwargs) -> Optional[str]:
-        async with aiohttp.ClientSession() as session:
+        async with curl_requests.AsyncSession() as session:
             params = {"key": self.api_key, "json": 1, "method": method, **kwargs}
             try:
-                async with session.get(self.base_url + "in.php", params=params) as resp:
-                    data = await resp.json()
-                    if not data.get("status"):
-                        logging.error(f"Xevil in.php error: {data}")
-                        return None
-                    captcha_id = data["request"]
+                resp = await session.get(self.base_url + "in.php", params=params)
+                data = resp.json()
+                if not data.get("status"):
+                    logging.error(f"Xevil in.php error: {data}")
+                    return None
+                captcha_id = data["request"]
             except Exception as e:
                 logging.error(f"Xevil request error: {e}")
                 return None
@@ -450,15 +450,15 @@ class XevilSolver:
             for _ in range(30):
                 await asyncio.sleep(3)
                 try:
-                    async with session.get(self.base_url + "res.php", params={
+                    resp = await session.get(self.base_url + "res.php", params={
                         "key": self.api_key, "action": "get", "id": captcha_id, "json": 1
-                    }) as resp:
-                        data = await resp.json()
-                        if data.get("status"):
-                            return data["request"]
-                        if data.get("request") != "CAPCHA_NOT_READY":
-                            logging.error(f"Xevil error: {data}")
-                            return None
+                    })
+                    data = resp.json()
+                    if data.get("status"):
+                        return data["request"]
+                    if data.get("request") != "CAPCHA_NOT_READY":
+                        logging.error(f"Xevil error: {data}")
+                        return None
                 except Exception:
                     continue
             return None
@@ -498,41 +498,57 @@ class FaucetClaimer:
             "User-Agent": self.user_agent,
         }
 
-        async with aiohttp.ClientSession(headers=headers) as session:
+        async with curl_requests.AsyncSession() as session:
             while not self._stop:
                 try:
                     await self.bot.send_message(self.user_id, f"🔄 {self.crane_name} claim starting...")
 
-                    # 1. Get CSRF token from cookie (PHP usuli)
+                    # 1. CSRF token olish
                     csrf = get_csrf_from_cookie(self.cookie)
                     if not csrf:
-                        await self.bot.send_message(self.user_id, "❌ csrf_cookie_name not found in cookie. Check cookie format.")
+                        await self.bot.send_message(self.user_id, "❌ csrf_cookie_name not found. Check cookie.")
                         break
 
-                    # 2. Solve captcha (PHP dagi captcha sinoviga o‘xshash)
-                    await self.bot.send_message(self.user_id, f"🔐 Solving {captcha_type} captcha...")
+                    # 2. Captcha yechish
+                    await self.bot.send_message(self.user_id, f"🔐 Solving {captcha_type}...")
                     if captcha_type == "turnstile":
                         cap = await self.solver.solve_turnstile(sitekey, host + "faucet.php")
                     else:
                         cap = await self.solver.solve_recaptcha_v2(sitekey, host + "faucet.php")
 
                     if not cap:
-                        await self.bot.send_message(self.user_id, "❌ Captcha solving failed. Check API key balance.")
+                        await self.bot.send_message(self.user_id, "❌ Captcha failed. Check API balance.")
                         break
 
-                    # 3. Submit claim (PHP dagi post parametrlariga mos)
+                    # 3. POST soʻrovi (PHP dagi barcha parametrlar bilan)
                     data = {
                         "action": action,
                         "csrf_test_name": csrf,
                         post_field: cap,
                         "g-recaptcha-response": "null",
                         "h-captcha-response": "null",
+                        "captcha": "",
+                        "ft": "",
                     }
                     if use_clbt:
                         data["clbt"] = "1"
 
-                    async with session.post(host + "process.php", data=data) as resp:
-                        result = await resp.json()
+                    # PHP botdagi kabi referer qoʻshish
+                    headers["Referer"] = host + "faucet.php"
+
+                    async with session.post(host + "process.php", data=data, headers=headers, impersonate="chrome") as resp:
+                        # Debug: nima kelganini koʻrish (agar xato boʻlsa)
+                        if resp.status != 200:
+                            await self.bot.send_message(self.user_id, f"❌ HTTP {resp.status}")
+                            break
+                        try:
+                            result = resp.json()
+                        except Exception as e:
+                            text = await resp.text()
+                            await self.bot.send_message(self.user_id, f"❌ Invalid JSON response (HTML). Session expired?")
+                            logging.error(f"JSON decode error: {e}\nResponse: {text[:500]}")
+                            break
+
                         if result.get("ret"):
                             reward = result.get("num", 0)
                             await self.on_success(reward)
@@ -541,10 +557,10 @@ class FaucetClaimer:
                             error_msg = result.get("mes", "Unknown error")
                             await self.bot.send_message(self.user_id, f"❌ Claim failed: {error_msg}")
                             if "login" in error_msg.lower() or "expired" in error_msg.lower():
-                                await self.bot.send_message(self.user_id, "⚠️ Account cookie expired. Please re-add account.")
+                                await self.bot.send_message(self.user_id, "⚠️ Cookie expired. Re-add account.")
                                 break
 
-                    # 4. Wait 1 hour (3600 seconds)
+                    # 4. 1 soat kutish
                     for _ in range(3600):
                         if self._stop:
                             break
@@ -557,19 +573,16 @@ class FaucetClaimer:
                     await asyncio.sleep(60)
 
     async def on_success(self, reward: float):
-        # Update user balance (deduct $0.01 per claim)
         if self.user_id not in USER_SETTINGS:
             USER_SETTINGS[self.user_id] = {"balance": 0, "total_spent": 0}
         USER_SETTINGS[self.user_id]["balance"] = USER_SETTINGS[self.user_id].get("balance", 0) - 0.01
         USER_SETTINGS[self.user_id]["total_spent"] = USER_SETTINGS[self.user_id].get("total_spent", 0) + 0.01
         save_user_settings()
 
-        # Update crane claims
         crane = get_crane(self.crane_name)
         if crane:
             crane["claims"] = crane.get("claims", 0) + 1
             save_cranes()
-            # Update live log
             LIVE_LOG["log_text"] = f"Claimed {reward} from {self.crane_name}"
             LIVE_LOG["crane_emoji"] = crane["emoji"]
             LIVE_LOG["crane_name"] = self.crane_name
@@ -805,7 +818,6 @@ async def cb_cancel_add(call: CallbackQuery, state: FSMContext):
         await call.message.answer(text=build_message_text(user_id), reply_markup=build_keyboard(user_id), parse_mode="HTML")
     await call.answer(get_text(user_id, "cancelled"))
 
-# ========== TOGGLE CLAIMER ==========
 @dp.callback_query(F.data.startswith("toggle_"))
 async def cb_toggle_claimer(call: CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
@@ -1113,7 +1125,6 @@ async def on_startup():
     global BOT_USERNAME
     me = await bot.get_me()
     BOT_USERNAME = me.username
-    # Delete webhook to avoid conflict
     await bot.delete_webhook(drop_pending_updates=True)
 
 async def shutdown():
