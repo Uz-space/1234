@@ -3,8 +3,10 @@ import asyncio
 import logging
 import json
 import os
+import re
 import aiohttp
-from typing import Optional
+from http.cookies import SimpleCookie
+from typing import Optional, Dict, Any
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart, Command
@@ -19,319 +21,164 @@ ADMIN_ID = 7399101034
 # ========== MULTI-LANGUAGE TEXTS (to‘liq) ==========
 TEXTS = {
     "en": {
-        "main_title": "RIPPERBOT",
-        "api_connected": "✅",
-        "api_disconnected": "❌",
-        "live_log": "📡 LIVE LOG",
-        "no_claims": "⏳ No claims yet...",
-        "crane_active_indicator": "✅",
-        "crane_inactive_indicator": "⚠️",
-        "add_account": "➕ Add Account",
-        "back": "◀️ Back",
-        "control_panel": "Control Panel",
-        "claims": "claims",
-        "balance": "💰 Balance",
-        "subscription": "💳 Subscription",
-        "invite_friend": "🎁 Invite Friend",
-        "settings": "⚙️ Settings",
-        "refresh": "🔄",
-        "active_accounts": "ACTIVE ACCOUNTS",
-        "no_accounts": "No active accounts — + to add",
-        "settings_title": "⚙️ Settings",
-        "api_key_label": "🔑 API Key",
-        "api_host_label": "🌐 API Host",
-        "api_key_not_set": "❌ Not set",
-        "api_key_set": "✅",
-        "settings_note": "Each user has their own API key.",
-        "language": "🌐 Language",
-        "select_language": "🌐 Select your language:",
-        "language_changed": "✅ Language changed!",
-        "subscription_title": "💳 Subscription",
-        "no_active_sub": "❌ No active subscription",
-        "accounts_count": "📊 Accounts: 0",
-        "claims_count": "📊 Claims: 0",
-        "available_plans": "✅ Available plans:",
-        "monthly": "📆 Monthly – $15/month",
-        "monthly_desc": "├ 50 accounts (any site)\n└ Unlimited claims",
-        "claim_pack": "🎫 Claim Pack – $1/1200 claims",
-        "claim_pack_desc": "├ Unlimited accounts\n└ 1200 claims per pack",
-        "pay_with_crypto": "💎 Pay with Crypto",
-        "select_crypto": "💎 Select Cryptocurrency\n\nChoose your preferred coin:",
-        "bnb": "🟡 BNB (BEP-20)",
-        "sol": "🟠 SOL",
-        "ltc": "⚪ LTC",
-        "ton": "💎 TON",
-        "trx": "🔴 TRX (TRC-20)",
-        "doge": "🐕 DOGE",
-        "wallet_address": "📍 Wallet Address:",
-        "amounts": "💰 Deposit any amount ($0.1 – $100 USD):",
-        "send_exact": "⚠️ Send exactly the amount you entered",
-        "submit_txid": "📝 After payment, tap Submit Screenshot",
-        "submit_txid_button": "📸 Submit Screenshot",
-        "enter_amount": "💰 Enter the amount in USD (min $0.1, max $100):",
+        "main_title": "RIPPERBOT", "api_connected": "✅", "api_disconnected": "❌",
+        "live_log": "📡 LIVE LOG", "no_claims": "⏳ No claims yet...",
+        "crane_active_indicator": "✅", "crane_inactive_indicator": "⚠️",
+        "add_account": "➕ Add Account", "back": "◀️ Back", "control_panel": "Control Panel",
+        "claims": "claims", "balance": "💰 Balance", "subscription": "💳 Subscription",
+        "invite_friend": "🎁 Invite Friend", "settings": "⚙️ Settings", "refresh": "🔄",
+        "active_accounts": "ACTIVE ACCOUNTS", "no_accounts": "No active accounts — + to add",
+        "settings_title": "⚙️ Settings", "api_key_label": "🔑 API Key", "api_host_label": "🌐 API Host",
+        "api_key_not_set": "❌ Not set", "api_key_set": "✅", "settings_note": "Each user has their own API key.",
+        "language": "🌐 Language", "select_language": "🌐 Select your language:",
+        "language_changed": "✅ Language changed!", "subscription_title": "💳 Subscription",
+        "no_active_sub": "❌ No active subscription", "accounts_count": "📊 Accounts: 0",
+        "claims_count": "📊 Claims: 0", "available_plans": "✅ Available plans:",
+        "monthly": "📆 Monthly – $15/month", "monthly_desc": "├ 50 accounts (any site)\n└ Unlimited claims",
+        "claim_pack": "🎫 Claim Pack – $1/1200 claims", "claim_pack_desc": "├ Unlimited accounts\n└ 1200 claims per pack",
+        "pay_with_crypto": "💎 Pay with Crypto", "select_crypto": "💎 Select Cryptocurrency\n\nChoose your preferred coin:",
+        "bnb": "🟡 BNB (BEP-20)", "sol": "🟠 SOL", "ltc": "⚪ LTC", "ton": "💎 TON", "trx": "🔴 TRX (TRC-20)", "doge": "🐕 DOGE",
+        "wallet_address": "📍 Wallet Address:", "amounts": "💰 Deposit any amount ($0.1 – $100 USD):",
+        "send_exact": "⚠️ Send exactly the amount you entered", "submit_txid": "📝 After payment, tap Submit Screenshot",
+        "submit_txid_button": "📸 Submit Screenshot", "enter_amount": "💰 Enter the amount in USD (min $0.1, max $100):",
         "enter_txid": "📸 Now send the payment screenshot (photo only):",
         "deposit_request": "💸 Deposit request from user {user_id}\nAmount: ${amount}\nProof: {txid}",
-        "approve": "✅ Approve",
-        "reject": "❌ Reject",
+        "approve": "✅ Approve", "reject": "❌ Reject",
         "deposit_approved": "✅ Your deposit of ${amount} has been approved! Balance updated.",
         "deposit_rejected": "❌ Your deposit request has been rejected. Please try again.",
         "txid_received": "📸 Screenshot received! Admin will review and add balance.",
-        "cancel": "❌ Cancel",
-        "skip_cookies": "⏭️ Skip Cookies",
-        "skip_ua": "⏭️ Skip UA",
-        "add_account_title": "Add Account — {crane}",
-        "label": "🏷️ Label: {label}",
-        "send_email": "📧 Send the account email:",
-        "cancel_abort": "/cancel to abort.",
-        "email_received": "📧 Email: <code>{email}</code>",
-        "send_password": "🔑 Now send the password:",
-        "password_ok": "🔑 Password: ✅",
-        "cookies_optional": "🍪 Cookies (required — send cookies):",
+        "cancel": "❌ Cancel", "skip_cookies": "⏭️ Skip Cookies", "skip_ua": "⏭️ Skip UA",
+        "add_account_title": "Add Account — {crane}", "label": "🏷️ Label: {label}",
+        "send_email": "📧 Send the account email:", "cancel_abort": "/cancel to abort.",
+        "email_received": "📧 Email: <code>{email}</code>", "send_password": "🔑 Now send the password:",
+        "password_ok": "🔑 Password: ✅", "cookies_optional": "🍪 Cookies (required — send cookies):",
         "cookies_instruction": "F12 > Console > <code>document.cookie</code>",
-        "cookies_skipped": "🍪 Cookies: Required",
-        "ua_optional": "🌐 User-Agent (required — send UA):",
+        "cookies_skipped": "🍪 Cookies: Required", "ua_optional": "🌐 User-Agent (required — send UA):",
         "ua_instruction": "F12 > Console > <code>navigator.userAgent</code>",
-        "cookies_received": "🍪 Cookies: ✅ ({len} chars)",
-        "account_added": "✅ <b>Account added!</b>",
-        "account_num": "{crane} #{num}",
-        "cookies_status": "🍪 {status}",
-        "ua_status": "🌐 UA: {status}",
-        "main_menu": "🏠 Main Menu",
-        "cancelled": "❌ Cancelled.",
-        "updated": "♻️ Updated!",
-        "not_found": "Not found!",
-        "api_key_prompt": "🔑 <b>XEvil API Key</b>\n\nSend your API key:\n\n/cancel to abort.",
+        "cookies_received": "🍪 Cookies: ✅ ({len} chars)", "account_added": "✅ <b>Account added!</b>",
+        "account_num": "{crane} #{num}", "cookies_status": "🍪 {status}", "ua_status": "🌐 UA: {status}",
+        "main_menu": "🏠 Main Menu", "cancelled": "❌ Cancelled.", "updated": "♻️ Updated!",
+        "not_found": "Not found!", "api_key_prompt": "🔑 <b>XEvil API Key</b>\n\nSend your API key:\n\n/cancel to abort.",
         "api_host_prompt": "🌐 <b>API Host</b>\n\nSend the API host (e.g. <code>sctg.xyz</code>):\n\n/cancel to abort.",
-        "referral_title": "🎁🎁 <b>Referral System</b>",
-        "your_link": "🔗 <b>Your referral link:</b>",
+        "referral_title": "🎁🎁 <b>Referral System</b>", "your_link": "🔗 <b>Your referral link:</b>",
         "share_text": "📢 <b>Share this link with your friends!</b>\n├ You get: <b>+16 claims</b>\n└ Your friend gets: <b>+8 claims</b>",
-        "friends_joined": "👥 <b>Friends joined:</b> {count}",
-        "bonus_earned": "📊 <b>Bonus claims earned:</b> {bonus}",
-        "share_button": "📨 Share with Friend",
-        "balance_title": "💰 <b>My Balance</b>",
-        "current_balance": "💵 Current balance: <b>${balance}</b>",
-        "total_deposited": "📥 Total deposited: <b>${deposited}</b>",
-        "total_spent": "📤 Total spent on captcha: <b>${spent}</b>",
-        "spent_note": "\n<i>Each claim costs $0.01 (1 cent)</i>",
-        "add_balance_usage": "Admin: /add_balance <user_id> <amount>",
-        "add_spent_usage": "Admin: /add_spent <user_id> <amount>",
+        "friends_joined": "👥 <b>Friends joined:</b> {count}", "bonus_earned": "📊 <b>Bonus claims earned:</b> {bonus}",
+        "share_button": "📨 Share with Friend", "balance_title": "💰 <b>My Balance</b>",
+        "current_balance": "💵 Current balance: <b>${balance}</b>", "total_deposited": "📥 Total deposited: <b>${deposited}</b>",
+        "total_spent": "📤 Total spent on captcha: <b>${spent}</b>", "spent_note": "\n<i>Each claim costs $0.01 (1 cent)</i>",
+        "add_balance_usage": "Admin: /add_balance <user_id> <amount>", "add_spent_usage": "Admin: /add_spent <user_id> <amount>",
         "balance_updated": "✅ Balance updated for user {user_id}: +${amount}, new balance: ${balance}",
         "spent_updated": "✅ Spent updated for user {user_id}: +${amount}, new spent: ${spent}",
         "invalid_amount": "❌ Invalid amount. Please enter a number between 0.1 and 100.",
-        "user_not_found": "❌ User not found.",
-        "admin_only": "❌ Admin command only.",
+        "user_not_found": "❌ User not found.", "admin_only": "❌ Admin command only.",
         "referral_bonus": "🎉 You got +16 claims! Referred by user {ref_id}",
         "referee_bonus": "🎉 Your friend got +8 claims for joining via your link!",
         "only_photo": "❌ Please send a PHOTO (screenshot) of your payment, not text.",
     },
     "uz": {
-        "main_title": "RIPPERBOT",
-        "api_connected": "✅",
-        "api_disconnected": "❌",
-        "live_log": "📡 JONLI LOG",
-        "no_claims": "⏳ Hali hech qanday claim yo'q...",
-        "crane_active_indicator": "✅",
-        "crane_inactive_indicator": "⚠️",
-        "add_account": "➕ Hisob qo'shish",
-        "back": "◀️ Orqaga",
-        "control_panel": "Boshqaruv paneli",
-        "claims": "claim",
-        "balance": "💰 Balans",
-        "subscription": "💳 Obuna",
-        "invite_friend": "🎁 Do'st taklif qilish",
-        "settings": "⚙️ Sozlamalar",
-        "refresh": "🔄",
-        "active_accounts": "FAOL HISOBLAR",
-        "no_accounts": "Faol hisoblar yo'q — + qo'shish",
-        "settings_title": "⚙️ Sozlamalar",
-        "api_key_label": "🔑 API kalit",
-        "api_host_label": "🌐 API host",
-        "api_key_not_set": "❌ O'rnatilmagan",
-        "api_key_set": "✅",
-        "settings_note": "Har bir foydalanuvchi o'z API kalitiga ega.",
-        "language": "🌐 Til",
-        "select_language": "🌐 Tilni tanlang:",
-        "language_changed": "✅ Til o'zgartirildi!",
-        "subscription_title": "💳 Obuna",
-        "no_active_sub": "❌ Faol obuna yo'q",
-        "accounts_count": "📊 Hisoblar: 0",
-        "claims_count": "📊 Claimlar: 0",
-        "available_plans": "✅ Mavjud rejalar:",
-        "monthly": "📆 Oylik – $15/oy",
-        "monthly_desc": "├ 50 ta hisob (istalgan sayt)\n└ Cheksiz claim",
-        "claim_pack": "🎫 Claim paketi – $1/1200 claim",
-        "claim_pack_desc": "├ Cheksiz hisob\n└ 1200 claim",
-        "pay_with_crypto": "💎 Kripto bilan to'lash",
-        "select_crypto": "💎 Kriptovalyutani tanlang\n\nO'zingizga qulay tangani belgilang:",
-        "bnb": "🟡 BNB (BEP-20)",
-        "sol": "🟠 SOL",
-        "ltc": "⚪ LTC",
-        "ton": "💎 TON",
-        "trx": "🔴 TRX (TRC-20)",
-        "doge": "🐕 DOGE",
-        "wallet_address": "📍 Hamyon manzili:",
-        "amounts": "💰 Istalgan miqdorni kiriting ($0.1 – $100 USD):",
-        "send_exact": "⚠️ Aynan kiritgan miqdorni yuboring",
-        "submit_txid": "📝 To'lovdan so'ng Screenshot yuboring",
-        "submit_txid_button": "📸 Screenshot yuborish",
-        "enter_amount": "💰 USD miqdorini kiriting (min $0.1, max $100):",
+        "main_title": "RIPPERBOT", "api_connected": "✅", "api_disconnected": "❌",
+        "live_log": "📡 JONLI LOG", "no_claims": "⏳ Hali hech qanday claim yo'q...",
+        "crane_active_indicator": "✅", "crane_inactive_indicator": "⚠️",
+        "add_account": "➕ Hisob qo'shish", "back": "◀️ Orqaga", "control_panel": "Boshqaruv paneli",
+        "claims": "claim", "balance": "💰 Balans", "subscription": "💳 Obuna",
+        "invite_friend": "🎁 Do'st taklif qilish", "settings": "⚙️ Sozlamalar", "refresh": "🔄",
+        "active_accounts": "FAOL HISOBLAR", "no_accounts": "Faol hisoblar yo'q — + qo'shish",
+        "settings_title": "⚙️ Sozlamalar", "api_key_label": "🔑 API kalit", "api_host_label": "🌐 API host",
+        "api_key_not_set": "❌ O'rnatilmagan", "api_key_set": "✅", "settings_note": "Har bir foydalanuvchi o'z API kalitiga ega.",
+        "language": "🌐 Til", "select_language": "🌐 Tilni tanlang:", "language_changed": "✅ Til o'zgartirildi!",
+        "subscription_title": "💳 Obuna", "no_active_sub": "❌ Faol obuna yo'q",
+        "accounts_count": "📊 Hisoblar: 0", "claims_count": "📊 Claimlar: 0", "available_plans": "✅ Mavjud rejalar:",
+        "monthly": "📆 Oylik – $15/oy", "monthly_desc": "├ 50 ta hisob (istalgan sayt)\n└ Cheksiz claim",
+        "claim_pack": "🎫 Claim paketi – $1/1200 claim", "claim_pack_desc": "├ Cheksiz hisob\n└ 1200 claim",
+        "pay_with_crypto": "💎 Kripto bilan to'lash", "select_crypto": "💎 Kriptovalyutani tanlang\n\nO'zingizga qulay tangani belgilang:",
+        "bnb": "🟡 BNB (BEP-20)", "sol": "🟠 SOL", "ltc": "⚪ LTC", "ton": "💎 TON", "trx": "🔴 TRX (TRC-20)", "doge": "🐕 DOGE",
+        "wallet_address": "📍 Hamyon manzili:", "amounts": "💰 Istalgan miqdorni kiriting ($0.1 – $100 USD):",
+        "send_exact": "⚠️ Aynan kiritgan miqdorni yuboring", "submit_txid": "📝 To'lovdan so'ng Screenshot yuboring",
+        "submit_txid_button": "📸 Screenshot yuborish", "enter_amount": "💰 USD miqdorini kiriting (min $0.1, max $100):",
         "enter_txid": "📸 Endi to'lov skrinshotini (faqat rasm) yuboring:",
         "deposit_request": "💸 {user_id} foydalanuvchidan to'lov so'rovi\nMiqdor: ${amount}\nTasdiq: {txid}",
-        "approve": "✅ Tasdiqlash",
-        "reject": "❌ Rad etish",
+        "approve": "✅ Tasdiqlash", "reject": "❌ Rad etish",
         "deposit_approved": "✅ ${amount} miqdoridagi to'lovingiz tasdiqlandi! Balans yangilandi.",
         "deposit_rejected": "❌ To'lov so'rovingiz rad etildi. Qaytadan urinib ko'ring.",
         "txid_received": "📸 Skrinshot qabul qilindi! Admin tekshirib balansni oshiradi.",
-        "cancel": "❌ Bekor qilish",
-        "skip_cookies": "⏭️ Cookies o'tkazib yuborish",
-        "skip_ua": "⏭️ UA o'tkazib yuborish",
-        "add_account_title": "Hisob qo'shish — {crane}",
-        "label": "🏷️ Label: {label}",
-        "send_email": "📧 Hisob emailini yuboring:",
-        "cancel_abort": "/cancel bekor qilish.",
-        "email_received": "📧 Email: <code>{email}</code>",
-        "send_password": "🔑 Endi parolni yuboring:",
-        "password_ok": "🔑 Parol: ✅",
-        "cookies_optional": "🍪 Cookies (majburiy — cookies yuboring):",
+        "cancel": "❌ Bekor qilish", "skip_cookies": "⏭️ Cookies o'tkazib yuborish", "skip_ua": "⏭️ UA o'tkazib yuborish",
+        "add_account_title": "Hisob qo'shish — {crane}", "label": "🏷️ Label: {label}",
+        "send_email": "📧 Hisob emailini yuboring:", "cancel_abort": "/cancel bekor qilish.",
+        "email_received": "📧 Email: <code>{email}</code>", "send_password": "🔑 Endi parolni yuboring:",
+        "password_ok": "🔑 Parol: ✅", "cookies_optional": "🍪 Cookies (majburiy — cookies yuboring):",
         "cookies_instruction": "F12 > Konsol > <code>document.cookie</code>",
-        "cookies_skipped": "🍪 Cookies: Majburiy",
-        "ua_optional": "🌐 User-Agent (majburiy — UA yuboring):",
+        "cookies_skipped": "🍪 Cookies: Majburiy", "ua_optional": "🌐 User-Agent (majburiy — UA yuboring):",
         "ua_instruction": "F12 > Konsol > <code>navigator.userAgent</code>",
-        "cookies_received": "🍪 Cookies: ✅ ({len} belgi)",
-        "account_added": "✅ <b>Hisob qo'shildi!</b>",
-        "account_num": "{crane} #{num}",
-        "cookies_status": "🍪 {status}",
-        "ua_status": "🌐 UA: {status}",
-        "main_menu": "🏠 Bosh menyu",
-        "cancelled": "❌ Bekor qilindi.",
-        "updated": "♻️ Yangilandi!",
-        "not_found": "Topilmadi!",
-        "api_key_prompt": "🔑 <b>XEvil API kaliti</b>\n\nAPI kalitingizni yuboring:\n\n/cancel bekor qilish.",
+        "cookies_received": "🍪 Cookies: ✅ ({len} belgi)", "account_added": "✅ <b>Hisob qo'shildi!</b>",
+        "account_num": "{crane} #{num}", "cookies_status": "🍪 {status}", "ua_status": "🌐 UA: {status}",
+        "main_menu": "🏠 Bosh menyu", "cancelled": "❌ Bekor qilindi.", "updated": "♻️ Yangilandi!",
+        "not_found": "Topilmadi!", "api_key_prompt": "🔑 <b>XEvil API kaliti</b>\n\nAPI kalitingizni yuboring:\n\n/cancel bekor qilish.",
         "api_host_prompt": "🌐 <b>API host</b>\n\nAPI hostni yuboring (masalan <code>sctg.xyz</code>):\n\n/cancel bekor qilish.",
-        "referral_title": "🎁🎁 <b>Referal tizimi</b>",
-        "your_link": "🔗 <b>Sizning referal linkingiz:</b>",
+        "referral_title": "🎁🎁 <b>Referal tizimi</b>", "your_link": "🔗 <b>Sizning referal linkingiz:</b>",
         "share_text": "📢 <b>Do'stlaringizga ulashing!</b>\n├ Siz: <b>+16 claim</b>\n├ Do'stingiz: <b>+8 claim</b>",
-        "friends_joined": "👥 <b>Qo'shilgan do'stlar:</b> {count}",
-        "bonus_earned": "📊 <b>Bonus claimlar:</b> {bonus}",
-        "share_button": "📨 Do'stga ulashish",
-        "balance_title": "💰 <b>Mening balansim</b>",
-        "current_balance": "💵 Joriy balans: <b>${balance}</b>",
-        "total_deposited": "📥 Jami to'ldirilgan: <b>${deposited}</b>",
-        "total_spent": "📤 Captchaga sarflangan: <b>${spent}</b>",
-        "spent_note": "\n<i>Har bir claim $0.01 (1 sent) turadi</i>",
-        "add_balance_usage": "Admin: /add_balance <user_id> <amount>",
-        "add_spent_usage": "Admin: /add_spent <user_id> <amount>",
+        "friends_joined": "👥 <b>Qo'shilgan do'stlar:</b> {count}", "bonus_earned": "📊 <b>Bonus claimlar:</b> {bonus}",
+        "share_button": "📨 Do'stga ulashish", "balance_title": "💰 <b>Mening balansim</b>",
+        "current_balance": "💵 Joriy balans: <b>${balance}</b>", "total_deposited": "📥 Jami to'ldirilgan: <b>${deposited}</b>",
+        "total_spent": "📤 Captchaga sarflangan: <b>${spent}</b>", "spent_note": "\n<i>Har bir claim $0.01 (1 sent) turadi</i>",
+        "add_balance_usage": "Admin: /add_balance <user_id> <amount>", "add_spent_usage": "Admin: /add_spent <user_id> <amount>",
         "balance_updated": "✅ {user_id} foydalanuvchi balansi +${amount}, yangi balans: ${balance}",
         "spent_updated": "✅ {user_id} foydalanuvchi sarfi +${amount}, yangi sarf: ${spent}",
         "invalid_amount": "❌ Noto'g'ri miqdor. Iltimos 0.1 va 100 orasida son kiriting.",
-        "user_not_found": "❌ Foydalanuvchi topilmadi.",
-        "admin_only": "❌ Faqat admin buyrug'i.",
+        "user_not_found": "❌ Foydalanuvchi topilmadi.", "admin_only": "❌ Faqat admin buyrug'i.",
         "referral_bonus": "🎉 Siz +16 claim oldingiz! Sizni {ref_id} taklif qildi.",
         "referee_bonus": "🎉 Do'stingiz sizning link orqali kelib +8 claim oldi!",
         "only_photo": "❌ Iltimos, to'lov skrinshotini RASM sifatida yuboring, matn emas.",
     },
     "ru": {
-        "main_title": "RIPPERBOT",
-        "api_connected": "✅",
-        "api_disconnected": "❌",
-        "live_log": "📡 ЖИВОЙ ЛОГ",
-        "no_claims": "⏳ Пока нет клеймов...",
-        "crane_active_indicator": "✅",
-        "crane_inactive_indicator": "⚠️",
-        "add_account": "➕ Добавить аккаунт",
-        "back": "◀️ Назад",
-        "control_panel": "Панель управления",
-        "claims": "клеймы",
-        "balance": "💰 Баланс",
-        "subscription": "💳 Подписка",
-        "invite_friend": "🎁 Пригласить друга",
-        "settings": "⚙️ Настройки",
-        "refresh": "🔄",
-        "active_accounts": "АКТИВНЫЕ АККАУНТЫ",
-        "no_accounts": "Нет активных аккаунтов — + добавить",
-        "settings_title": "⚙️ Настройки",
-        "api_key_label": "🔑 API ключ",
-        "api_host_label": "🌐 API хост",
-        "api_key_not_set": "❌ Не установлен",
-        "api_key_set": "✅",
-        "settings_note": "У каждого пользователя свой API ключ.",
-        "language": "🌐 Язык",
-        "select_language": "🌐 Выберите язык:",
-        "language_changed": "✅ Язык изменён!",
-        "subscription_title": "💳 Подписка",
-        "no_active_sub": "❌ Нет активной подписки",
-        "accounts_count": "📊 Аккаунтов: 0",
-        "claims_count": "📊 Клеймов: 0",
-        "available_plans": "✅ Доступные планы:",
-        "monthly": "📆 Месячный – $15/мес",
-        "monthly_desc": "├ 50 аккаунтов (любой сайт)\n└ Безлимитные клеймы",
-        "claim_pack": "🎫 Пакет клеймов – $1/1200 клеймов",
-        "claim_pack_desc": "├ Безлимит аккаунтов\n└ 1200 клеймов",
-        "pay_with_crypto": "💎 Оплатить криптой",
-        "select_crypto": "💎 Выберите криптовалюту\n\nПредпочитаемая монета:",
-        "bnb": "🟡 BNB (BEP-20)",
-        "sol": "🟠 SOL",
-        "ltc": "⚪ LTC",
-        "ton": "💎 TON",
-        "trx": "🔴 TRX (TRC-20)",
-        "doge": "🐕 DOGE",
-        "wallet_address": "📍 Адрес кошелька:",
-        "amounts": "💰 Введите любую сумму ($0.1 – $100 USD):",
-        "send_exact": "⚠️ Отправьте точно введённую сумму",
-        "submit_txid": "📝 После оплаты нажмите Отправить скриншот",
-        "submit_txid_button": "📸 Отправить скриншот",
-        "enter_amount": "💰 Введите сумму в USD (мин $0.1, макс $100):",
+        "main_title": "RIPPERBOT", "api_connected": "✅", "api_disconnected": "❌",
+        "live_log": "📡 ЖИВОЙ ЛОГ", "no_claims": "⏳ Пока нет клеймов...",
+        "crane_active_indicator": "✅", "crane_inactive_indicator": "⚠️",
+        "add_account": "➕ Добавить аккаунт", "back": "◀️ Назад", "control_panel": "Панель управления",
+        "claims": "клеймы", "balance": "💰 Баланс", "subscription": "💳 Подписка",
+        "invite_friend": "🎁 Пригласить друга", "settings": "⚙️ Настройки", "refresh": "🔄",
+        "active_accounts": "АКТИВНЫЕ АККАУНТЫ", "no_accounts": "Нет активных аккаунтов — + добавить",
+        "settings_title": "⚙️ Настройки", "api_key_label": "🔑 API ключ", "api_host_label": "🌐 API хост",
+        "api_key_not_set": "❌ Не установлен", "api_key_set": "✅", "settings_note": "У каждого пользователя свой API ключ.",
+        "language": "🌐 Язык", "select_language": "🌐 Выберите язык:", "language_changed": "✅ Язык изменён!",
+        "subscription_title": "💳 Подписка", "no_active_sub": "❌ Нет активной подписки",
+        "accounts_count": "📊 Аккаунтов: 0", "claims_count": "📊 Клеймов: 0", "available_plans": "✅ Доступные планы:",
+        "monthly": "📆 Месячный – $15/мес", "monthly_desc": "├ 50 аккаунтов (любой сайт)\n└ Безлимитные клеймы",
+        "claim_pack": "🎫 Пакет клеймов – $1/1200 клеймов", "claim_pack_desc": "├ Безлимит аккаунтов\n└ 1200 клеймов",
+        "pay_with_crypto": "💎 Оплатить криптой", "select_crypto": "💎 Выберите криптовалюту\n\nПредпочитаемая монета:",
+        "bnb": "🟡 BNB (BEP-20)", "sol": "🟠 SOL", "ltc": "⚪ LTC", "ton": "💎 TON", "trx": "🔴 TRX (TRC-20)", "doge": "🐕 DOGE",
+        "wallet_address": "📍 Адрес кошелька:", "amounts": "💰 Введите любую сумму ($0.1 – $100 USD):",
+        "send_exact": "⚠️ Отправьте точно введённую сумму", "submit_txid": "📝 После оплаты нажмите Отправить скриншот",
+        "submit_txid_button": "📸 Отправить скриншот", "enter_amount": "💰 Введите сумму в USD (мин $0.1, макс $100):",
         "enter_txid": "📸 Теперь отправьте скриншот оплаты (только фото):",
         "deposit_request": "💸 Запрос пополнения от пользователя {user_id}\nСумма: ${amount}\nПодтверждение: {txid}",
-        "approve": "✅ Подтвердить",
-        "reject": "❌ Отклонить",
+        "approve": "✅ Подтвердить", "reject": "❌ Отклонить",
         "deposit_approved": "✅ Ваш депозит на сумму ${amount} подтверждён! Баланс обновлён.",
         "deposit_rejected": "❌ Ваш запрос отклонён. Попробуйте снова.",
         "txid_received": "📸 Скриншот получен! Администратор проверит и пополнит баланс.",
-        "cancel": "❌ Отмена",
-        "skip_cookies": "⏭️ Пропустить Cookies",
-        "skip_ua": "⏭️ Пропустить UA",
-        "add_account_title": "Добавить аккаунт — {crane}",
-        "label": "🏷️ Метка: {label}",
-        "send_email": "📧 Отправьте email аккаунта:",
-        "cancel_abort": "/cancel для отмены.",
-        "email_received": "📧 Email: <code>{email}</code>",
-        "send_password": "🔑 Теперь отправьте пароль:",
-        "password_ok": "🔑 Пароль: ✅",
-        "cookies_optional": "🍪 Cookies (обязательно — отправьте cookies):",
+        "cancel": "❌ Отмена", "skip_cookies": "⏭️ Пропустить Cookies", "skip_ua": "⏭️ Пропустить UA",
+        "add_account_title": "Добавить аккаунт — {crane}", "label": "🏷️ Метка: {label}",
+        "send_email": "📧 Отправьте email аккаунта:", "cancel_abort": "/cancel для отмены.",
+        "email_received": "📧 Email: <code>{email}</code>", "send_password": "🔑 Теперь отправьте пароль:",
+        "password_ok": "🔑 Пароль: ✅", "cookies_optional": "🍪 Cookies (обязательно — отправьте cookies):",
         "cookies_instruction": "F12 > Консоль > <code>document.cookie</code>",
-        "cookies_skipped": "🍪 Cookies: Обязательно",
-        "ua_optional": "🌐 User-Agent (обязательно — отправьте UA):",
+        "cookies_skipped": "🍪 Cookies: Обязательно", "ua_optional": "🌐 User-Agent (обязательно — отправьте UA):",
         "ua_instruction": "F12 > Консоль > <code>navigator.userAgent</code>",
-        "cookies_received": "🍪 Cookies: ✅ ({len} симв.)",
-        "account_added": "✅ <b>Аккаунт добавлен!</b>",
-        "account_num": "{crane} #{num}",
-        "cookies_status": "🍪 {status}",
-        "ua_status": "🌐 UA: {status}",
-        "main_menu": "🏠 Главное меню",
-        "cancelled": "❌ Отменено.",
-        "updated": "♻️ Обновлено!",
-        "not_found": "Не найдено!",
-        "api_key_prompt": "🔑 <b>XEvil API ключ</b>\n\nОтправьте ваш API ключ:\n\n/cancel для отмены.",
+        "cookies_received": "🍪 Cookies: ✅ ({len} симв.)", "account_added": "✅ <b>Аккаунт добавлен!</b>",
+        "account_num": "{crane} #{num}", "cookies_status": "🍪 {status}", "ua_status": "🌐 UA: {status}",
+        "main_menu": "🏠 Главное меню", "cancelled": "❌ Отменено.", "updated": "♻️ Обновлено!",
+        "not_found": "Не найдено!", "api_key_prompt": "🔑 <b>XEvil API ключ</b>\n\nОтправьте ваш API ключ:\n\n/cancel для отмены.",
         "api_host_prompt": "🌐 <b>API хост</b>\n\nОтправьте API хост (например <code>sctg.xyz</code>):\n\n/cancel для отмены.",
-        "referral_title": "🎁🎁 <b>Реферальная система</b>",
-        "your_link": "🔗 <b>Ваша реферальная ссылка:</b>",
+        "referral_title": "🎁🎁 <b>Реферальная система</b>", "your_link": "🔗 <b>Ваша реферальная ссылка:</b>",
         "share_text": "📢 <b>Поделитесь ссылкой с друзьями!</b>\n├ Вы получаете: <b>+16 клеймов</b>\n└ Друг получает: <b>+8 клеймов</b>",
-        "friends_joined": "👥 <b>Присоединилось друзей:</b> {count}",
-        "bonus_earned": "📊 <b>Заработано бонусов:</b> {bonus}",
-        "share_button": "📨 Поделиться с другом",
-        "balance_title": "💰 <b>Мой баланс</b>",
-        "current_balance": "💵 Текущий баланс: <b>${balance}</b>",
-        "total_deposited": "📥 Всего пополнено: <b>${deposited}</b>",
-        "total_spent": "📤 Потрачено на капчу: <b>${spent}</b>",
-        "spent_note": "\n<i>Каждый клейм стоит $0.01 (1 цент)</i>",
-        "add_balance_usage": "Admin: /add_balance <user_id> <amount>",
-        "add_spent_usage": "Admin: /add_spent <user_id> <amount>",
+        "friends_joined": "👥 <b>Присоединилось друзей:</b> {count}", "bonus_earned": "📊 <b>Заработано бонусов:</b> {bonus}",
+        "share_button": "📨 Поделиться с другом", "balance_title": "💰 <b>Мой баланс</b>",
+        "current_balance": "💵 Текущий баланс: <b>${balance}</b>", "total_deposited": "📥 Всего пополнено: <b>${deposited}</b>",
+        "total_spent": "📤 Потрачено на капчу: <b>${spent}</b>", "spent_note": "\n<i>Каждый клейм стоит $0.01 (1 цент)</i>",
+        "add_balance_usage": "Admin: /add_balance <user_id> <amount>", "add_spent_usage": "Admin: /add_spent <user_id> <amount>",
         "balance_updated": "✅ Баланс пользователя {user_id} +${amount}, новый баланс: ${balance}",
         "spent_updated": "✅ Расход пользователя {user_id} +${amount}, новый расход: ${spent}",
         "invalid_amount": "❌ Неверная сумма. Введите число от 0.1 до 100.",
-        "user_not_found": "❌ Пользователь не найден.",
-        "admin_only": "❌ Только для администратора.",
+        "user_not_found": "❌ Пользователь не найден.", "admin_only": "❌ Только для администратора.",
         "referral_bonus": "🎉 Вы получили +16 клеймов! Вас пригласил {ref_id}",
         "referee_bonus": "🎉 Ваш друг получил +8 клеймов за переход по вашей ссылке!",
         "only_photo": "❌ Пожалуйста, отправьте ФОТО (скриншот) оплаты, а не текст.",
@@ -408,7 +255,7 @@ def cancel_keyboard(user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_add")]])
 
 def get_csrf_from_cookie(cookie_str: str) -> Optional[str]:
-    """Cookie string ichidan csrf_cookie_name qiymatini olish"""
+    """Cookie string ichidan csrf_cookie_name qiymatini olish (PHP dagi getCsrf() ga o‘xshash)"""
     parts = cookie_str.split(';')
     for part in parts:
         part = part.strip()
@@ -499,17 +346,80 @@ def build_settings_keyboard(user_id: int):
         [InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="back_main")]
     ])
 
-# ========== CLAIMER ==========
+# ========== CLAIMER (Xevil + HTTP) – to‘liq PHP logikasiga mos ==========
 CRANE_CONFIG = {
-    "TronPick": {"host": "https://tronpick.io/", "type": "recaptcha", "key": "6LeBFBclAAAAANoZIrwXU1cPgYDDM7f1ehHpzXWj", "field": "g-recaptcha-response"},
-    "LitePick": {"host": "https://litepick.io/", "type": "turnstile", "key": "0x4AAAAAAA0-UWDHOKP0OrgS", "field": "c_captcha_response", "clbt": 1},
-    "DogePick": {"host": "https://dogepick.io/", "type": "recaptcha", "key": "6LfVA0obAAAAAI8bLZBdotcvg-ms4heUAP1ebfjO", "field": "g-recaptcha-response", "clbt": 1},
-    "PolPick":  {"host": "https://polpick.io/", "type": "recaptcha", "key": "6LcHOR8rAAAAAFBzOKHRFY6yLoilRi-JyGnQdUtq", "field": "g-recaptcha-response", "clbt": 1},
-    "BnbPick":  {"host": "https://bnbpick.io/", "type": "turnstile", "key": "0x4AAAAAAA0_O3uScCqtpqXl", "field": "c_captcha_response", "clbt": 1},
-    "SolPick":  {"host": "https://solpick.io/", "type": "recaptcha", "key": "6LdfNx8rAAAAAIkedgGnuX6TIRANDEDA2fsIjx3s", "field": "g-recaptcha-response"},
-    "SuiPick":  {"host": "https://suipick.io/", "type": "turnstile", "key": "0x4AAAAAABgtwLBJbn9NePjw", "field": "c_captcha_response"},
-    "TonPick":  {"host": "https://tonpick.game/", "type": "turnstile", "key": "0x4AAAAAAA1JQuZADVDIzQ65", "field": "c_captcha_response", "clbt": 1},
-    "BchPick":  {"host": "https://bchpick.io/", "type": "turnstile", "key": "0x4AAAAAADexuS24rGq6WGDh", "field": "c_captcha_response", "clbt": 1},
+    "TronPick": {
+        "host": "https://tronpick.io/",
+        "captcha_type": "recaptcha",
+        "sitekey": "6LeBFBclAAAAANoZIrwXU1cPgYDDM7f1ehHpzXWj",
+        "post_field": "g-recaptcha-response",
+        "action": "claim_hourly_faucet",
+        "use_clbt": False,
+    },
+    "LitePick": {
+        "host": "https://litepick.io/",
+        "captcha_type": "turnstile",
+        "sitekey": "0x4AAAAAAA0-UWDHOKP0OrgS",
+        "post_field": "c_captcha_response",
+        "action": "claim_hourly_faucet",
+        "use_clbt": True,
+    },
+    "DogePick": {
+        "host": "https://dogepick.io/",
+        "captcha_type": "recaptcha",
+        "sitekey": "6LfVA0obAAAAAI8bLZBdotcvg-ms4heUAP1ebfjO",
+        "post_field": "g-recaptcha-response",
+        "action": "claim_hourly_faucet",
+        "use_clbt": True,
+    },
+    "PolPick": {
+        "host": "https://polpick.io/",
+        "captcha_type": "recaptcha",
+        "sitekey": "6LcHOR8rAAAAAFBzOKHRFY6yLoilRi-JyGnQdUtq",
+        "post_field": "g-recaptcha-response",
+        "action": "claim_hourly_faucet",
+        "use_clbt": True,
+    },
+    "BnbPick": {
+        "host": "https://bnbpick.io/",
+        "captcha_type": "turnstile",
+        "sitekey": "0x4AAAAAAA0_O3uScCqtpqXl",
+        "post_field": "c_captcha_response",
+        "action": "claim_hourly_faucet",
+        "use_clbt": True,
+    },
+    "SolPick": {
+        "host": "https://solpick.io/",
+        "captcha_type": "recaptcha",
+        "sitekey": "6LdfNx8rAAAAAIkedgGnuX6TIRANDEDA2fsIjx3s",
+        "post_field": "g-recaptcha-response",
+        "action": "claim_hourly_faucet",
+        "use_clbt": False,
+    },
+    "SuiPick": {
+        "host": "https://suipick.io/",
+        "captcha_type": "turnstile",
+        "sitekey": "0x4AAAAAABgtwLBJbn9NePjw",
+        "post_field": "c_captcha_response",
+        "action": "claim_hourly_faucet",
+        "use_clbt": False,
+    },
+    "TonPick": {
+        "host": "https://tonpick.game/",
+        "captcha_type": "turnstile",
+        "sitekey": "0x4AAAAAAA1JQuZADVDIzQ65",
+        "post_field": "c_captcha_response",
+        "action": "claim_hourly_faucet",
+        "use_clbt": True,
+    },
+    "BchPick": {
+        "host": "https://bchpick.io/",
+        "captcha_type": "turnstile",
+        "sitekey": "0x4AAAAAADexuS24rGq6WGDh",
+        "post_field": "c_captcha_response",
+        "action": "claim_hourly_faucet",
+        "use_clbt": True,
+    },
 }
 
 class XevilSolver:
@@ -575,11 +485,11 @@ class FaucetClaimer:
             return
 
         host = config["host"]
-        sitekey = config["key"]
-        captcha_type = config["type"]
-        post_field = config["field"]
-        action = "claim_hourly_faucet"
-        use_clbt = config.get("clbt", False)
+        sitekey = config["sitekey"]
+        captcha_type = config["captcha_type"]
+        post_field = config["post_field"]
+        action = config["action"]
+        use_clbt = config.get("use_clbt", False)
 
         headers = {
             "Host": host.split("//")[1].rstrip("/"),
@@ -591,13 +501,16 @@ class FaucetClaimer:
         async with aiohttp.ClientSession(headers=headers) as session:
             while not self._stop:
                 try:
-                    # Get CSRF token from cookie
+                    await self.bot.send_message(self.user_id, f"🔄 {self.crane_name} claim starting...")
+
+                    # 1. Get CSRF token from cookie (PHP usuli)
                     csrf = get_csrf_from_cookie(self.cookie)
                     if not csrf:
                         await self.bot.send_message(self.user_id, "❌ csrf_cookie_name not found in cookie. Check cookie format.")
                         break
 
-                    # Solve captcha
+                    # 2. Solve captcha (PHP dagi captcha sinoviga o‘xshash)
+                    await self.bot.send_message(self.user_id, f"🔐 Solving {captcha_type} captcha...")
                     if captcha_type == "turnstile":
                         cap = await self.solver.solve_turnstile(sitekey, host + "faucet.php")
                     else:
@@ -607,7 +520,7 @@ class FaucetClaimer:
                         await self.bot.send_message(self.user_id, "❌ Captcha solving failed. Check API key balance.")
                         break
 
-                    # Submit claim
+                    # 3. Submit claim (PHP dagi post parametrlariga mos)
                     data = {
                         "action": action,
                         "csrf_test_name": csrf,
@@ -623,6 +536,7 @@ class FaucetClaimer:
                         if result.get("ret"):
                             reward = result.get("num", 0)
                             await self.on_success(reward)
+                            await self.bot.send_message(self.user_id, f"✅ Claimed {reward} from {self.crane_name} (-$0.01)")
                         else:
                             error_msg = result.get("mes", "Unknown error")
                             await self.bot.send_message(self.user_id, f"❌ Claim failed: {error_msg}")
@@ -630,7 +544,7 @@ class FaucetClaimer:
                                 await self.bot.send_message(self.user_id, "⚠️ Account cookie expired. Please re-add account.")
                                 break
 
-                    # Wait 1 hour
+                    # 4. Wait 1 hour (3600 seconds)
                     for _ in range(3600):
                         if self._stop:
                             break
@@ -643,7 +557,7 @@ class FaucetClaimer:
                     await asyncio.sleep(60)
 
     async def on_success(self, reward: float):
-        # Update user balance (deduct $0.01)
+        # Update user balance (deduct $0.01 per claim)
         if self.user_id not in USER_SETTINGS:
             USER_SETTINGS[self.user_id] = {"balance": 0, "total_spent": 0}
         USER_SETTINGS[self.user_id]["balance"] = USER_SETTINGS[self.user_id].get("balance", 0) - 0.01
@@ -655,6 +569,7 @@ class FaucetClaimer:
         if crane:
             crane["claims"] = crane.get("claims", 0) + 1
             save_cranes()
+            # Update live log
             LIVE_LOG["log_text"] = f"Claimed {reward} from {self.crane_name}"
             LIVE_LOG["crane_emoji"] = crane["emoji"]
             LIVE_LOG["crane_name"] = self.crane_name
@@ -890,6 +805,7 @@ async def cb_cancel_add(call: CallbackQuery, state: FSMContext):
         await call.message.answer(text=build_message_text(user_id), reply_markup=build_keyboard(user_id), parse_mode="HTML")
     await call.answer(get_text(user_id, "cancelled"))
 
+# ========== TOGGLE CLAIMER ==========
 @dp.callback_query(F.data.startswith("toggle_"))
 async def cb_toggle_claimer(call: CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
@@ -1197,6 +1113,7 @@ async def on_startup():
     global BOT_USERNAME
     me = await bot.get_me()
     BOT_USERNAME = me.username
+    # Delete webhook to avoid conflict
     await bot.delete_webhook(drop_pending_updates=True)
 
 async def shutdown():
