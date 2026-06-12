@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-# bot.py - complete Telegram bot with faucet claimer (no PHP needed)
-
 import asyncio
 import logging
 import json
 import os
-import re
 import aiohttp
-from typing import Optional, Dict, Any, Callable
+from typing import Optional
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart, Command
@@ -16,11 +13,10 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 logging.basicConfig(level=logging.INFO)
-
-BOT_TOKEN = "8565430862:AAGehtqqTWqvLS-H4BH-LyUE6VfSbVJy698"
+BOT_TOKEN = "8565430862:AAEKjNqGjNKOpamnlqanPfJdUbmNY6Cu86k"
 ADMIN_ID = 7399101034
 
-# ========== MULTI-LANGUAGE TEXTS ==========
+# ========== MULTI-LANGUAGE TEXTS (full) ==========
 TEXTS = {
     "en": {
         "main_title": "RIPPERBOT",
@@ -90,10 +86,10 @@ TEXTS = {
         "email_received": "📧 Email: <code>{email}</code>",
         "send_password": "🔑 Now send the password:",
         "password_ok": "🔑 Password: ✅",
-        "cookies_optional": "🍪 Cookies (optional — send cookies or tap Skip):",
+        "cookies_optional": "🍪 Cookies (required — send cookies):",
         "cookies_instruction": "F12 > Console > <code>document.cookie</code>",
-        "cookies_skipped": "🍪 Cookies: ⏭️ Skipped",
-        "ua_optional": "🌐 User-Agent (optional — send UA or tap Skip):",
+        "cookies_skipped": "🍪 Cookies: Required",
+        "ua_optional": "🌐 User-Agent (required — send UA):",
         "ua_instruction": "F12 > Console > <code>navigator.userAgent</code>",
         "cookies_received": "🍪 Cookies: ✅ ({len} chars)",
         "account_added": "✅ <b>Account added!</b>",
@@ -196,10 +192,10 @@ TEXTS = {
         "email_received": "📧 Email: <code>{email}</code>",
         "send_password": "🔑 Endi parolni yuboring:",
         "password_ok": "🔑 Parol: ✅",
-        "cookies_optional": "🍪 Cookies (ixtiyoriy — cookies yuboring yoki Skip bosing):",
+        "cookies_optional": "🍪 Cookies (majburiy — cookies yuboring):",
         "cookies_instruction": "F12 > Konsol > <code>document.cookie</code>",
-        "cookies_skipped": "🍪 Cookies: ⏭️ O'tkazib yuborildi",
-        "ua_optional": "🌐 User-Agent (ixtiyoriy — UA yuboring yoki Skip bosing):",
+        "cookies_skipped": "🍪 Cookies: Majburiy",
+        "ua_optional": "🌐 User-Agent (majburiy — UA yuboring):",
         "ua_instruction": "F12 > Konsol > <code>navigator.userAgent</code>",
         "cookies_received": "🍪 Cookies: ✅ ({len} belgi)",
         "account_added": "✅ <b>Hisob qo'shildi!</b>",
@@ -214,7 +210,7 @@ TEXTS = {
         "api_host_prompt": "🌐 <b>API host</b>\n\nAPI hostni yuboring (masalan <code>sctg.xyz</code>):\n\n/cancel bekor qilish.",
         "referral_title": "🎁🎁 <b>Referal tizimi</b>",
         "your_link": "🔗 <b>Sizning referal linkingiz:</b>",
-        "share_text": "📢 <b>Do'stlaringizga ulashing!</b>\n├ Siz: <b>+16 claim</b>\n└ Do'stingiz: <b>+8 claim</b>",
+        "share_text": "📢 <b>Do'stlaringizga ulashing!</b>\n├ Siz: <b>+16 claim</b>\n├ Do'stingiz: <b>+8 claim</b>",
         "friends_joined": "👥 <b>Qo'shilgan do'stlar:</b> {count}",
         "bonus_earned": "📊 <b>Bonus claimlar:</b> {bonus}",
         "share_button": "📨 Do'stga ulashish",
@@ -302,10 +298,10 @@ TEXTS = {
         "email_received": "📧 Email: <code>{email}</code>",
         "send_password": "🔑 Теперь отправьте пароль:",
         "password_ok": "🔑 Пароль: ✅",
-        "cookies_optional": "🍪 Cookies (опционально — отправьте cookies или нажмите Skip):",
+        "cookies_optional": "🍪 Cookies (обязательно — отправьте cookies):",
         "cookies_instruction": "F12 > Консоль > <code>document.cookie</code>",
-        "cookies_skipped": "🍪 Cookies: ⏭️ Пропущено",
-        "ua_optional": "🌐 User-Agent (опционально — отправьте UA или нажмите Skip):",
+        "cookies_skipped": "🍪 Cookies: Обязательно",
+        "ua_optional": "🌐 User-Agent (обязательно — отправьте UA):",
         "ua_instruction": "F12 > Консоль > <code>navigator.userAgent</code>",
         "cookies_received": "🍪 Cookies: ✅ ({len} симв.)",
         "account_added": "✅ <b>Аккаунт добавлен!</b>",
@@ -342,6 +338,16 @@ TEXTS = {
     }
 }
 
+def get_text(user_id: int, key: str, **kwargs) -> str:
+    lang = USER_SETTINGS.get(user_id, {}).get("language", "en")
+    text = TEXTS.get(lang, TEXTS["en"]).get(key, key)
+    if kwargs:
+        try:
+            return text.format(**kwargs)
+        except KeyError:
+            return text
+    return text
+
 # ========== PERSISTENT STORAGE ==========
 DATA_DIR = "data"
 USER_SETTINGS_FILE = os.path.join(DATA_DIR, "user_settings.json")
@@ -367,7 +373,7 @@ def load_cranes():
     if os.path.exists(CRANES_FILE):
         with open(CRANES_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    # Default cranes
+    # Default cranes (10 ta)
     return [
         {"name": "TronPick", "emoji": "🔴",  "active": False, "multiplier": None, "claims": 0, "max_claims": "∞", "balance": 0, "accounts": []},
         {"name": "LitePick", "emoji": "🌕",  "active": False, "multiplier": None, "claims": 0, "max_claims": "∞", "balance": 0, "accounts": []},
@@ -393,38 +399,14 @@ API_STATE = {"connected": False, "domain": "sctg.xyz", "plan": "Trial", "account
 LIVE_LOG = {"crane_emoji": "", "crane_name": "", "log_text": ""}
 BOT_USERNAME = ""
 PENDING_DEPOSITS = {}
-
-# Active claimer tasks
 running_claimers = {}  # key: f"{user_id}_{crane_name}_{account_index}"
 
 # ========== HELPER FUNCTIONS ==========
-def get_text(user_id: int, key: str, **kwargs) -> str:
-    lang = USER_SETTINGS.get(user_id, {}).get("language", "en")
-    text = TEXTS.get(lang, TEXTS["en"]).get(key, key)
-    if kwargs:
-        try:
-            return text.format(**kwargs)
-        except KeyError:
-            return text
-    return text
-
 def get_crane(name: str):
     return next((c for c in CRANES if c["name"] == name), None)
 
 def cancel_keyboard(user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_add")]])
-
-def skip_cookies_keyboard(user_id: int):
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_add")],
-        [InlineKeyboardButton(text=get_text(user_id, "skip_cookies"), callback_data="skip_cookies")]
-    ])
-
-def skip_ua_keyboard(user_id: int):
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_add")],
-        [InlineKeyboardButton(text=get_text(user_id, "skip_ua"), callback_data="skip_ua")]
-    ])
 
 def build_message_text(user_id: int) -> str:
     lines = []
@@ -509,7 +491,7 @@ def build_settings_keyboard(user_id: int):
         [InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="back_main")]
     ])
 
-# ========== CLAIMER CLASS (replaces PHP bots) ==========
+# ========== CLAIMER (Xevil + HTTP) ==========
 CRANE_CONFIG = {
     "TronPick": {
         "host": "https://tronpick.io/",
@@ -628,16 +610,14 @@ class XevilSolver:
 
 class FaucetClaimer:
     def __init__(self, user_id: int, crane_name: str, account_index: int,
-                 cookie: str, user_agent: str, api_key: str,
-                 on_success: Callable, on_error: Callable):
+                 cookie: str, user_agent: str, api_key: str, bot: Bot):
         self.user_id = user_id
         self.crane_name = crane_name
         self.account_index = account_index
         self.cookie = cookie
         self.user_agent = user_agent
         self.solver = XevilSolver(api_key)
-        self.on_success = on_success
-        self.on_error = on_error
+        self.bot = bot
         self._stop = False
 
     def stop(self):
@@ -646,7 +626,7 @@ class FaucetClaimer:
     async def run(self):
         config = CRANE_CONFIG.get(self.crane_name)
         if not config:
-            logging.error(f"No config for {self.crane_name}")
+            await self.bot.send_message(self.user_id, f"❌ No configuration for {self.crane_name}")
             return
 
         host = config["host"]
@@ -666,30 +646,35 @@ class FaucetClaimer:
         async with aiohttp.ClientSession(headers=headers) as session:
             while not self._stop:
                 try:
-                    # 1. Get faucet page and CSRF
+                    await self.bot.send_message(self.user_id, f"🔄 {self.crane_name} claim starting...")
+
+                    # 1. Get CSRF token
                     async with session.get(host + "faucet.php") as resp:
                         if resp.status != 200:
-                            await self._handle_error("HTTP error")
+                            await self.bot.send_message(self.user_id, f"❌ HTTP {resp.status} from faucet.php")
                             break
+                        html = await resp.text()
                         csrf = None
                         for cookie in resp.cookies:
                             if cookie.key == "csrf_cookie_name":
                                 csrf = cookie.value
                                 break
                         if not csrf:
-                            await self._handle_error("CSRF token not found")
+                            await self.bot.send_message(self.user_id, "❌ CSRF token not found (cookie expired?)")
                             break
 
                     # 2. Solve captcha
+                    await self.bot.send_message(self.user_id, f"🔐 Solving {captcha_type} captcha...")
                     if captcha_type == "turnstile":
                         cap = await self.solver.solve_turnstile(sitekey, host + "faucet.php")
                     else:
                         cap = await self.solver.solve_recaptcha_v2(sitekey, host + "faucet.php")
+
                     if not cap:
-                        await self._handle_error("Captcha solving failed")
+                        await self.bot.send_message(self.user_id, "❌ Captcha solving failed. Check API key balance.")
                         break
 
-                    # 3. Prepare POST data
+                    # 3. Submit claim
                     data = {
                         "action": action,
                         "csrf_test_name": csrf,
@@ -700,20 +685,20 @@ class FaucetClaimer:
                     if use_clbt:
                         data["clbt"] = "1"
 
-                    # 4. Submit claim
                     async with session.post(host + "process.php", data=data) as resp:
                         result = await resp.json()
                         if result.get("ret"):
-                            reward = float(result.get("num", 0))
-                            await self.on_success(self.user_id, self.crane_name, self.account_index, reward)
-                            logging.info(f"Claim success: {result['mes']}")
+                            reward = result.get("num", 0)
+                            await self.on_success(reward)
+                            await self.bot.send_message(self.user_id, f"✅ Claimed {reward} from {self.crane_name} (-$0.01)")
                         else:
                             error_msg = result.get("mes", "Unknown error")
-                            await self._handle_error(error_msg)
+                            await self.bot.send_message(self.user_id, f"❌ Claim failed: {error_msg}")
                             if "login" in error_msg.lower() or "expired" in error_msg.lower():
+                                await self.bot.send_message(self.user_id, "⚠️ Account cookie expired. Please re-add account.")
                                 break
 
-                    # 5. Wait one hour
+                    # 4. Wait 1 hour
                     for _ in range(3600):
                         if self._stop:
                             break
@@ -722,36 +707,26 @@ class FaucetClaimer:
                 except asyncio.CancelledError:
                     break
                 except Exception as e:
-                    logging.exception(f"Claimer error: {e}")
-                    await self._handle_error(str(e))
+                    await self.bot.send_message(self.user_id, f"⚠️ Error: {str(e)}")
                     await asyncio.sleep(60)
 
-    async def _handle_error(self, msg: str):
-        await self.on_error(self.user_id, self.crane_name, self.account_index, msg)
+    async def on_success(self, reward: float):
+        # Update user balance (deduct $0.01)
+        if self.user_id not in USER_SETTINGS:
+            USER_SETTINGS[self.user_id] = {"balance": 0, "total_spent": 0}
+        USER_SETTINGS[self.user_id]["balance"] = USER_SETTINGS[self.user_id].get("balance", 0) - 0.01
+        USER_SETTINGS[self.user_id]["total_spent"] = USER_SETTINGS[self.user_id].get("total_spent", 0) + 0.01
+        save_user_settings()
 
-# ========== CLAIM CALLBACKS ==========
-async def on_claim_success(user_id: int, crane_name: str, account_index: int, reward: float):
-    cost = 0.01
-    if user_id not in USER_SETTINGS:
-        USER_SETTINGS[user_id] = {"balance": 0, "total_deposited": 0, "total_spent": 0, "referrals": [], "referral_bonus": 0}
-    USER_SETTINGS[user_id]["balance"] = USER_SETTINGS[user_id].get("balance", 0.0) - cost
-    USER_SETTINGS[user_id]["total_spent"] = USER_SETTINGS[user_id].get("total_spent", 0.0) + cost
-    save_user_settings()
-
-    crane = get_crane(crane_name)
-    if crane:
-        crane["claims"] = crane.get("claims", 0) + 1
-        save_cranes()
-        LIVE_LOG["log_text"] = f"Claimed {reward} from {crane_name}"
-        LIVE_LOG["crane_emoji"] = crane["emoji"]
-        LIVE_LOG["crane_name"] = crane_name
-
-async def on_claim_error(user_id: int, crane_name: str, account_index: int, error_msg: str):
-    crane = get_crane(crane_name)
-    if crane and account_index < len(crane.get("accounts", [])):
-        crane["accounts"][account_index]["active"] = False
-        save_cranes()
-    logging.error(f"Claim error for {user_id} {crane_name} acc{account_index}: {error_msg}")
+        # Update crane claims
+        crane = get_crane(self.crane_name)
+        if crane:
+            crane["claims"] = crane.get("claims", 0) + 1
+            save_cranes()
+            # Update live log
+            LIVE_LOG["log_text"] = f"Claimed {reward} from {self.crane_name}"
+            LIVE_LOG["crane_emoji"] = crane["emoji"]
+            LIVE_LOG["crane_name"] = self.crane_name
 
 # ========== FSM STATES ==========
 class AddAccount(StatesGroup):
@@ -910,6 +885,81 @@ async def cb_add_account(call: CallbackQuery, state: FSMContext):
     await call.message.answer(text=f"{crane['emoji']} <b>{get_text(user_id, 'add_account_title', crane=crane_name)}</b>\n\n{get_text(user_id, 'label', label=label)}\n\n{get_text(user_id, 'send_email')}\n\n{get_text(user_id, 'cancel_abort')}", reply_markup=cancel_keyboard(user_id), parse_mode="HTML")
     await call.answer()
 
+@dp.message(AddAccount.email)
+async def fsm_email(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    email = message.text.strip()
+    await state.update_data(email=email)
+    await state.set_state(AddAccount.password)
+    await message.answer(text=f"{get_text(user_id, 'email_received', email=email)}\n\n{get_text(user_id, 'send_password')}\n\n{get_text(user_id, 'cancel_abort')}", reply_markup=cancel_keyboard(user_id), parse_mode="HTML")
+
+@dp.message(AddAccount.password)
+async def fsm_password(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    password = message.text.strip()
+    await state.update_data(password=password)
+    await state.set_state(AddAccount.cookies)
+    await message.answer(text=f"{get_text(user_id, 'password_ok')}\n\n{get_text(user_id, 'cookies_optional')}\n\n{get_text(user_id, 'cookies_instruction')}\n\n{get_text(user_id, 'cancel_abort')}", reply_markup=cancel_keyboard(user_id), parse_mode="HTML")
+
+@dp.message(AddAccount.cookies)
+async def fsm_cookies(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    cookies = message.text.strip()
+    await state.update_data(cookies=cookies)
+    await state.set_state(AddAccount.ua)
+    await message.answer(text=f"{get_text(user_id, 'cookies_received', len=len(cookies))}\n\n{get_text(user_id, 'ua_optional')}\n\n{get_text(user_id, 'ua_instruction')}\n\n{get_text(user_id, 'cancel_abort')}", reply_markup=cancel_keyboard(user_id), parse_mode="HTML")
+
+@dp.message(AddAccount.ua)
+async def fsm_ua(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    ua = message.text.strip()
+    await state.update_data(ua=ua)
+    await _finish_add_account(message, state)
+
+async def _finish_add_account(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    data = await state.get_data()
+    crane_name = data["crane_name"]
+    label = data["label"]
+    email = data["email"]
+    password = data["password"]
+    cookies = data.get("cookies")
+    ua = data.get("ua")
+    crane = get_crane(crane_name)
+    if crane is None:
+        await state.clear()
+        return
+    crane["accounts"].append({
+        "label": label, "email": email, "password": password,
+        "cookies": cookies, "ua": ua, "active": True
+    })
+    crane["active"] = True
+    save_cranes()
+    await state.clear()
+    await message.answer(
+        text=f"{get_text(user_id, 'account_added')}\n\n{crane['emoji']} {get_text(user_id, 'account_num', crane=crane_name, num=len(crane['accounts']))}\n📝 {label}\n📧 <code>{email}</code>\n🔑 ✅\n{get_text(user_id, 'cookies_status', status='✅' if cookies else '⏭️')}\n{get_text(user_id, 'ua_status', status='✅' if ua else '⏭️')}",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=f"◀️ {crane_name}", callback_data=f"crane_{crane_name}")],
+            [InlineKeyboardButton(text=get_text(user_id, "main_menu"), callback_data="back_main")]
+        ]),
+        parse_mode="HTML"
+    )
+
+@dp.callback_query(F.data == "cancel_add")
+async def cb_cancel_add(call: CallbackQuery, state: FSMContext):
+    user_id = call.from_user.id
+    data = await state.get_data()
+    crane_name = data.get("crane_name", "")
+    await state.clear()
+    crane = get_crane(crane_name)
+    await call.message.delete()
+    if crane:
+        await call.message.answer(text=crane_panel_text(crane, user_id), reply_markup=build_crane_keyboard(crane_name, user_id), parse_mode="HTML")
+    else:
+        await call.message.answer(text=build_message_text(user_id), reply_markup=build_keyboard(user_id), parse_mode="HTML")
+    await call.answer(get_text(user_id, "cancelled"))
+
+# ========== TOGGLE CLAIMER ==========
 @dp.callback_query(F.data.startswith("toggle_"))
 async def cb_toggle_claimer(call: CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
@@ -945,8 +995,7 @@ async def cb_toggle_claimer(call: CallbackQuery, state: FSMContext):
             cookie=cookie,
             user_agent=ua,
             api_key=api_key,
-            on_success=on_claim_success,
-            on_error=on_claim_error
+            bot=bot
         )
         task = asyncio.create_task(claimer.run())
         running_claimers[key] = task
@@ -956,93 +1005,6 @@ async def cb_toggle_claimer(call: CallbackQuery, state: FSMContext):
     await call.message.edit_text(
         text=crane_panel_text(crane, user_id),
         reply_markup=build_crane_keyboard(crane_name, user_id),
-        parse_mode="HTML"
-    )
-
-@dp.callback_query(F.data == "cancel_add")
-async def cb_cancel_add(call: CallbackQuery, state: FSMContext):
-    user_id = call.from_user.id
-    data = await state.get_data()
-    crane_name = data.get("crane_name", "")
-    await state.clear()
-    crane = get_crane(crane_name)
-    await call.message.delete()
-    if crane:
-        await call.message.answer(text=crane_panel_text(crane, user_id), reply_markup=build_crane_keyboard(crane_name, user_id), parse_mode="HTML")
-    else:
-        await call.message.answer(text=build_message_text(user_id), reply_markup=build_keyboard(user_id), parse_mode="HTML")
-    await call.answer(get_text(user_id, "cancelled"))
-
-# ... (FSM email, password, cookies, ua handlers) ...
-@dp.message(AddAccount.email)
-async def fsm_email(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    email = message.text.strip()
-    await state.update_data(email=email)
-    await state.set_state(AddAccount.password)
-    await message.answer(text=f"{get_text(user_id, 'email_received', email=email)}\n\n{get_text(user_id, 'send_password')}\n\n{get_text(user_id, 'cancel_abort')}", reply_markup=cancel_keyboard(user_id), parse_mode="HTML")
-
-@dp.message(AddAccount.password)
-async def fsm_password(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    password = message.text.strip()
-    await state.update_data(password=password)
-    await state.set_state(AddAccount.cookies)
-    await message.answer(text=f"{get_text(user_id, 'password_ok')}\n\n{get_text(user_id, 'cookies_optional')}\n\n{get_text(user_id, 'cookies_instruction')}\n\n{get_text(user_id, 'cancel_abort')}", reply_markup=skip_cookies_keyboard(user_id), parse_mode="HTML")
-
-@dp.callback_query(F.data == "skip_cookies")
-async def cb_skip_cookies(call: CallbackQuery, state: FSMContext):
-    user_id = call.from_user.id
-    await state.update_data(cookies=None)
-    await state.set_state(AddAccount.ua)
-    await call.message.edit_text(text=f"{get_text(user_id, 'cookies_skipped')}\n\n{get_text(user_id, 'ua_optional')}\n\n{get_text(user_id, 'ua_instruction')}\n\n{get_text(user_id, 'cancel_abort')}", reply_markup=skip_ua_keyboard(user_id), parse_mode="HTML")
-    await call.answer()
-
-@dp.message(AddAccount.cookies)
-async def fsm_cookies(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    cookies = message.text.strip()
-    await state.update_data(cookies=cookies)
-    await state.set_state(AddAccount.ua)
-    await message.answer(text=f"{get_text(user_id, 'cookies_received', len=len(cookies))}\n\n{get_text(user_id, 'ua_optional')}\n\n{get_text(user_id, 'ua_instruction')}\n\n{get_text(user_id, 'cancel_abort')}", reply_markup=skip_ua_keyboard(user_id), parse_mode="HTML")
-
-@dp.callback_query(F.data == "skip_ua")
-async def cb_skip_ua(call: CallbackQuery, state: FSMContext):
-    await state.update_data(ua=None)
-    await _finish_add_account(call.message, state)
-    await call.answer()
-
-@dp.message(AddAccount.ua)
-async def fsm_ua(message: Message, state: FSMContext):
-    await state.update_data(ua=message.text.strip())
-    await _finish_add_account(message, state)
-
-async def _finish_add_account(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    data = await state.get_data()
-    crane_name = data["crane_name"]
-    label = data["label"]
-    email = data["email"]
-    password = data["password"]
-    cookies = data.get("cookies")
-    ua = data.get("ua")
-    crane = get_crane(crane_name)
-    if crane is None:
-        await state.clear()
-        return
-    crane["accounts"].append({
-        "label": label, "email": email, "password": password,
-        "cookies": cookies, "ua": ua, "active": True
-    })
-    crane["active"] = True
-    save_cranes()
-    await state.clear()
-    await message.answer(
-        text=f"{get_text(user_id, 'account_added')}\n\n{crane['emoji']} {get_text(user_id, 'account_num', crane=crane_name, num=len(crane['accounts']))}\n📝 {label}\n📧 <code>{email}</code>\n🔑 ✅\n{get_text(user_id, 'cookies_status', status='✅' if cookies else '⏭️')}\n{get_text(user_id, 'ua_status', status='✅' if ua else '⏭️')}",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=f"◀️ {crane_name}", callback_data=f"crane_{crane_name}")],
-            [InlineKeyboardButton(text=get_text(user_id, "main_menu"), callback_data="back_main")]
-        ]),
         parse_mode="HTML"
     )
 
@@ -1305,6 +1267,8 @@ async def on_startup():
     global BOT_USERNAME
     me = await bot.get_me()
     BOT_USERNAME = me.username
+    # Delete webhook to avoid conflict
+    await bot.delete_webhook(drop_pending_updates=True)
 
 async def shutdown():
     for task in running_claimers.values():
