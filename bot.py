@@ -4,6 +4,7 @@ import logging
 import json
 import os
 import re
+import aiohttp
 from typing import Optional, Dict, Any
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -11,7 +12,6 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from curl_cffi import requests as curl_requests
 
 logging.basicConfig(level=logging.INFO)
 BOT_TOKEN = "8565430862:AAEKjNqGjNKOpamnlqanPfJdUbmNY6Cu86k"
@@ -346,7 +346,7 @@ def build_settings_keyboard(user_id: int):
         [InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="back_main")]
     ])
 
-# ========== CLAIMER (curl_cffi bilan, PHP dagi kabi to‘liq) ==========
+# ========== CLAIMER (aiohttp bilan) ==========
 CRANE_CONFIG = {
     "TronPick": {
         "host": "https://tronpick.io/",
@@ -434,15 +434,15 @@ class XevilSolver:
         return await self._solve("userrecaptcha", sitekey=sitekey, pageurl=pageurl)
 
     async def _solve(self, method: str, **kwargs) -> Optional[str]:
-        async with curl_requests.AsyncSession() as session:
+        async with aiohttp.ClientSession() as session:
             params = {"key": self.api_key, "json": 1, "method": method, **kwargs}
             try:
-                resp = await session.get(self.base_url + "in.php", params=params)
-                data = resp.json()
-                if not data.get("status"):
-                    logging.error(f"Xevil in.php error: {data}")
-                    return None
-                captcha_id = data["request"]
+                async with session.get(self.base_url + "in.php", params=params) as resp:
+                    data = await resp.json()
+                    if not data.get("status"):
+                        logging.error(f"Xevil in.php error: {data}")
+                        return None
+                    captcha_id = data["request"]
             except Exception as e:
                 logging.error(f"Xevil request error: {e}")
                 return None
@@ -450,15 +450,15 @@ class XevilSolver:
             for _ in range(30):
                 await asyncio.sleep(3)
                 try:
-                    resp = await session.get(self.base_url + "res.php", params={
+                    async with session.get(self.base_url + "res.php", params={
                         "key": self.api_key, "action": "get", "id": captcha_id, "json": 1
-                    })
-                    data = resp.json()
-                    if data.get("status"):
-                        return data["request"]
-                    if data.get("request") != "CAPCHA_NOT_READY":
-                        logging.error(f"Xevil error: {data}")
-                        return None
+                    }) as resp:
+                        data = await resp.json()
+                        if data.get("status"):
+                            return data["request"]
+                        if data.get("request") != "CAPCHA_NOT_READY":
+                            logging.error(f"Xevil error: {data}")
+                            return None
                 except Exception:
                     continue
             return None
@@ -498,7 +498,7 @@ class FaucetClaimer:
             "User-Agent": self.user_agent,
         }
 
-        async with curl_requests.AsyncSession() as session:
+        async with aiohttp.ClientSession() as session:
             while not self._stop:
                 try:
                     await self.bot.send_message(self.user_id, f"🔄 {self.crane_name} claim starting...")
@@ -536,13 +536,13 @@ class FaucetClaimer:
                     # PHP botdagi kabi referer qoʻshish
                     headers["Referer"] = host + "faucet.php"
 
-                    async with session.post(host + "process.php", data=data, headers=headers, impersonate="chrome") as resp:
+                    async with session.post(host + "process.php", data=data, headers=headers) as resp:
                         # Debug: nima kelganini koʻrish (agar xato boʻlsa)
                         if resp.status != 200:
                             await self.bot.send_message(self.user_id, f"❌ HTTP {resp.status}")
                             break
                         try:
-                            result = resp.json()
+                            result = await resp.json()
                         except Exception as e:
                             text = await resp.text()
                             await self.bot.send_message(self.user_id, f"❌ Invalid JSON response (HTML). Session expired?")
