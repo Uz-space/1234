@@ -1,11 +1,11 @@
-#!/usr/bin/env python3
 import asyncio
 import logging
-import json
-import os
 import re
-import aiohttp
-from typing import Optional, Dict, Any
+import time
+import requests
+from typing import Optional, Dict
+
+import cloudscraper
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart, Command
@@ -14,284 +14,423 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 logging.basicConfig(level=logging.INFO)
-BOT_TOKEN = "8565430862:AAEKjNqGjNKOpamnlqanPfJdUbmNY6Cu86k"
-ADMIN_ID = 7399101034
 
-# ========== MULTI-LANGUAGE TEXTS (to‘liq) ==========
+BOT_TOKEN = "8952550187:AAH87AXq35FuN8AoAkp1IEuT4uqWnpJgNug"  # O'z tokeningizni qo'ying
+
+# ─── Tillar (faqat o'zbek) ──────────────────────────────────────────────────
 TEXTS = {
-    "en": {
-        "main_title": "RIPPERBOT", "api_connected": "✅", "api_disconnected": "❌",
-        "live_log": "📡 LIVE LOG", "no_claims": "⏳ No claims yet...",
-        "crane_active_indicator": "✅", "crane_inactive_indicator": "⚠️",
-        "add_account": "➕ Add Account", "back": "◀️ Back", "control_panel": "Control Panel",
-        "claims": "claims", "balance": "💰 Balance", "subscription": "💳 Subscription",
-        "invite_friend": "🎁 Invite Friend", "settings": "⚙️ Settings", "refresh": "🔄",
-        "active_accounts": "ACTIVE ACCOUNTS", "no_accounts": "No active accounts — + to add",
-        "settings_title": "⚙️ Settings", "api_key_label": "🔑 API Key", "api_host_label": "🌐 API Host",
-        "api_key_not_set": "❌ Not set", "api_key_set": "✅", "settings_note": "Each user has their own API key.",
-        "language": "🌐 Language", "select_language": "🌐 Select your language:",
-        "language_changed": "✅ Language changed!", "subscription_title": "💳 Subscription",
-        "no_active_sub": "❌ No active subscription", "accounts_count": "📊 Accounts: 0",
-        "claims_count": "📊 Claims: 0", "available_plans": "✅ Available plans:",
-        "monthly": "📆 Monthly – $15/month", "monthly_desc": "├ 50 accounts (any site)\n└ Unlimited claims",
-        "claim_pack": "🎫 Claim Pack – $1/1200 claims", "claim_pack_desc": "├ Unlimited accounts\n└ 1200 claims per pack",
-        "pay_with_crypto": "💎 Pay with Crypto", "select_crypto": "💎 Select Cryptocurrency\n\nChoose your preferred coin:",
-        "bnb": "🟡 BNB (BEP-20)", "sol": "🟠 SOL", "ltc": "⚪ LTC", "ton": "💎 TON", "trx": "🔴 TRX (TRC-20)", "doge": "🐕 DOGE",
-        "wallet_address": "📍 Wallet Address:", "amounts": "💰 Deposit any amount ($0.1 – $100 USD):",
-        "send_exact": "⚠️ Send exactly the amount you entered", "submit_txid": "📝 After payment, tap Submit Screenshot",
-        "submit_txid_button": "📸 Submit Screenshot", "enter_amount": "💰 Enter the amount in USD (min $0.1, max $100):",
-        "enter_txid": "📸 Now send the payment screenshot (photo only):",
-        "deposit_request": "💸 Deposit request from user {user_id}\nAmount: ${amount}\nProof: {txid}",
-        "approve": "✅ Approve", "reject": "❌ Reject",
-        "deposit_approved": "✅ Your deposit of ${amount} has been approved! Balance updated.",
-        "deposit_rejected": "❌ Your deposit request has been rejected. Please try again.",
-        "txid_received": "📸 Screenshot received! Admin will review and add balance.",
-        "cancel": "❌ Cancel", "skip_cookies": "⏭️ Skip Cookies", "skip_ua": "⏭️ Skip UA",
-        "add_account_title": "Add Account — {crane}", "label": "🏷️ Label: {label}",
-        "send_email": "📧 Send the account email:", "cancel_abort": "/cancel to abort.",
-        "email_received": "📧 Email: <code>{email}</code>", "send_password": "🔑 Now send the password:",
-        "password_ok": "🔑 Password: ✅", "cookies_optional": "🍪 Cookies (required — send cookies):",
-        "cookies_instruction": "F12 > Console > <code>document.cookie</code>",
-        "cookies_skipped": "🍪 Cookies: Required", "ua_optional": "🌐 User-Agent (required — send UA):",
-        "ua_instruction": "F12 > Console > <code>navigator.userAgent</code>",
-        "cookies_received": "🍪 Cookies: ✅ ({len} chars)", "account_added": "✅ <b>Account added!</b>",
-        "account_num": "{crane} #{num}", "cookies_status": "🍪 {status}", "ua_status": "🌐 UA: {status}",
-        "main_menu": "🏠 Main Menu", "cancelled": "❌ Cancelled.", "updated": "♻️ Updated!",
-        "not_found": "Not found!", "api_key_prompt": "🔑 <b>XEvil API Key</b>\n\nSend your API key:\n\n/cancel to abort.",
-        "api_host_prompt": "🌐 <b>API Host</b>\n\nSend the API host (e.g. <code>sctg.xyz</code>):\n\n/cancel to abort.",
-        "referral_title": "🎁🎁 <b>Referral System</b>", "your_link": "🔗 <b>Your referral link:</b>",
-        "share_text": "📢 <b>Share this link with your friends!</b>\n├ You get: <b>+16 claims</b>\n└ Your friend gets: <b>+8 claims</b>",
-        "friends_joined": "👥 <b>Friends joined:</b> {count}", "bonus_earned": "📊 <b>Bonus claims earned:</b> {bonus}",
-        "share_button": "📨 Share with Friend", "balance_title": "💰 <b>My Balance</b>",
-        "current_balance": "💵 Current balance: <b>${balance}</b>", "total_deposited": "📥 Total deposited: <b>${deposited}</b>",
-        "total_spent": "📤 Total spent on captcha: <b>${spent}</b>", "spent_note": "\n<i>Each claim costs $0.01 (1 cent)</i>",
-        "add_balance_usage": "Admin: /add_balance <user_id> <amount>", "add_spent_usage": "Admin: /add_spent <user_id> <amount>",
-        "balance_updated": "✅ Balance updated for user {user_id}: +${amount}, new balance: ${balance}",
-        "spent_updated": "✅ Spent updated for user {user_id}: +${amount}, new spent: ${spent}",
-        "invalid_amount": "❌ Invalid amount. Please enter a number between 0.1 and 100.",
-        "user_not_found": "❌ User not found.", "admin_only": "❌ Admin command only.",
-        "referral_bonus": "🎉 You got +16 claims! Referred by user {ref_id}",
-        "referee_bonus": "🎉 Your friend got +8 claims for joining via your link!",
-        "only_photo": "❌ Please send a PHOTO (screenshot) of your payment, not text.",
-    },
     "uz": {
-        "main_title": "RIPPERBOT", "api_connected": "✅", "api_disconnected": "❌",
-        "live_log": "📡 JONLI LOG", "no_claims": "⏳ Hali hech qanday claim yo'q...",
-        "crane_active_indicator": "✅", "crane_inactive_indicator": "⚠️",
-        "add_account": "➕ Hisob qo'shish", "back": "◀️ Orqaga", "control_panel": "Boshqaruv paneli",
-        "claims": "claim", "balance": "💰 Balans", "subscription": "💳 Obuna",
-        "invite_friend": "🎁 Do'st taklif qilish", "settings": "⚙️ Sozlamalar", "refresh": "🔄",
-        "active_accounts": "FAOL HISOBLAR", "no_accounts": "Faol hisoblar yo'q — + qo'shish",
-        "settings_title": "⚙️ Sozlamalar", "api_key_label": "🔑 API kalit", "api_host_label": "🌐 API host",
-        "api_key_not_set": "❌ O'rnatilmagan", "api_key_set": "✅", "settings_note": "Har bir foydalanuvchi o'z API kalitiga ega.",
-        "language": "🌐 Til", "select_language": "🌐 Tilni tanlang:", "language_changed": "✅ Til o'zgartirildi!",
-        "subscription_title": "💳 Obuna", "no_active_sub": "❌ Faol obuna yo'q",
-        "accounts_count": "📊 Hisoblar: 0", "claims_count": "📊 Claimlar: 0", "available_plans": "✅ Mavjud rejalar:",
-        "monthly": "📆 Oylik – $15/oy", "monthly_desc": "├ 50 ta hisob (istalgan sayt)\n└ Cheksiz claim",
-        "claim_pack": "🎫 Claim paketi – $1/1200 claim", "claim_pack_desc": "├ Cheksiz hisob\n└ 1200 claim",
-        "pay_with_crypto": "💎 Kripto bilan to'lash", "select_crypto": "💎 Kriptovalyutani tanlang\n\nO'zingizga qulay tangani belgilang:",
-        "bnb": "🟡 BNB (BEP-20)", "sol": "🟠 SOL", "ltc": "⚪ LTC", "ton": "💎 TON", "trx": "🔴 TRX (TRC-20)", "doge": "🐕 DOGE",
-        "wallet_address": "📍 Hamyon manzili:", "amounts": "💰 Istalgan miqdorni kiriting ($0.1 – $100 USD):",
-        "send_exact": "⚠️ Aynan kiritgan miqdorni yuboring", "submit_txid": "📝 To'lovdan so'ng Screenshot yuboring",
-        "submit_txid_button": "📸 Screenshot yuborish", "enter_amount": "💰 USD miqdorini kiriting (min $0.1, max $100):",
-        "enter_txid": "📸 Endi to'lov skrinshotini (faqat rasm) yuboring:",
-        "deposit_request": "💸 {user_id} foydalanuvchidan to'lov so'rovi\nMiqdor: ${amount}\nTasdiq: {txid}",
-        "approve": "✅ Tasdiqlash", "reject": "❌ Rad etish",
-        "deposit_approved": "✅ ${amount} miqdoridagi to'lovingiz tasdiqlandi! Balans yangilandi.",
-        "deposit_rejected": "❌ To'lov so'rovingiz rad etildi. Qaytadan urinib ko'ring.",
-        "txid_received": "📸 Skrinshot qabul qilindi! Admin tekshirib balansni oshiradi.",
-        "cancel": "❌ Bekor qilish", "skip_cookies": "⏭️ Cookies o'tkazib yuborish", "skip_ua": "⏭️ UA o'tkazib yuborish",
-        "add_account_title": "Hisob qo'shish — {crane}", "label": "🏷️ Label: {label}",
-        "send_email": "📧 Hisob emailini yuboring:", "cancel_abort": "/cancel bekor qilish.",
-        "email_received": "📧 Email: <code>{email}</code>", "send_password": "🔑 Endi parolni yuboring:",
-        "password_ok": "🔑 Parol: ✅", "cookies_optional": "🍪 Cookies (majburiy — cookies yuboring):",
+        "main_title": "LITEPICK & TRONPICK BOT",
+        "api_connected": "✅",
+        "api_disconnected": "❌",
+        "live_log": "📡 JONLI LOG",
+        "no_claims": "⏳ Hali hech qanday claim yo‘q...",
+        "crane_active": "✅",
+        "crane_inactive": "⚠️",
+        "add_account": "➕ Hisob qo‘shish",
+        "claim_now": "▶️ Claimni boshlash",
+        "back": "◀️ Orqaga",
+        "control_panel": "Boshqaruv paneli",
+        "claims": "claim",
+        "balance": "💰 Balans",
+        "subscription": "💳 Obuna",
+        "invite_friend": "🎁 Do‘st taklif qilish",
+        "settings": "⚙️ Sozlamalar",
+        "refresh": "🔄",
+        "active_accounts": "FAOL HISOBLAR",
+        "no_accounts": "Faol hisoblar yo‘q — + qo‘shish",
+        "settings_title": "⚙️ Sozlamalar",
+        "api_key_label": "🔑 API kalit",
+        "api_host_label": "🌐 API host",
+        "api_key_not_set": "❌ O‘rnatilmagan",
+        "api_key_set": "✅",
+        "settings_note": "API kalit va hostni sozlang.",
+        "cancel": "❌ Bekor qilish",
+        "skip_cookies": "⏭️ Cookies o‘tkazib yuborish",
+        "skip_ua": "⏭️ UA o‘tkazib yuborish",
+        "add_account_title": "Hisob qo‘shish — {crane}",
+        "label": "🏷️ Label: {label}",
+        "send_email": "📧 Hisob emailini yuboring:",
+        "cancel_abort": "/cancel bekor qilish.",
+        "email_received": "📧 Email: <code>{email}</code>",
+        "send_password": "🔑 Endi parolni yuboring:",
+        "password_ok": "🔑 Parol: ✅",
+        "cookies_optional": "🍪 Cookies (ixtiyoriy):",
         "cookies_instruction": "F12 > Konsol > <code>document.cookie</code>",
-        "cookies_skipped": "🍪 Cookies: Majburiy", "ua_optional": "🌐 User-Agent (majburiy — UA yuboring):",
+        "cookies_skipped": "🍪 Cookies: ⏭️ O‘tkazib yuborildi",
+        "ua_optional": "🌐 User-Agent (ixtiyoriy):",
         "ua_instruction": "F12 > Konsol > <code>navigator.userAgent</code>",
-        "cookies_received": "🍪 Cookies: ✅ ({len} belgi)", "account_added": "✅ <b>Hisob qo'shildi!</b>",
-        "account_num": "{crane} #{num}", "cookies_status": "🍪 {status}", "ua_status": "🌐 UA: {status}",
-        "main_menu": "🏠 Bosh menyu", "cancelled": "❌ Bekor qilindi.", "updated": "♻️ Yangilandi!",
-        "not_found": "Topilmadi!", "api_key_prompt": "🔑 <b>XEvil API kaliti</b>\n\nAPI kalitingizni yuboring:\n\n/cancel bekor qilish.",
-        "api_host_prompt": "🌐 <b>API host</b>\n\nAPI hostni yuboring (masalan <code>sctg.xyz</code>):\n\n/cancel bekor qilish.",
-        "referral_title": "🎁🎁 <b>Referal tizimi</b>", "your_link": "🔗 <b>Sizning referal linkingiz:</b>",
-        "share_text": "📢 <b>Do'stlaringizga ulashing!</b>\n├ Siz: <b>+16 claim</b>\n├ Do'stingiz: <b>+8 claim</b>",
-        "friends_joined": "👥 <b>Qo'shilgan do'stlar:</b> {count}", "bonus_earned": "📊 <b>Bonus claimlar:</b> {bonus}",
-        "share_button": "📨 Do'stga ulashish", "balance_title": "💰 <b>Mening balansim</b>",
-        "current_balance": "💵 Joriy balans: <b>${balance}</b>", "total_deposited": "📥 Jami to'ldirilgan: <b>${deposited}</b>",
-        "total_spent": "📤 Captchaga sarflangan: <b>${spent}</b>", "spent_note": "\n<i>Har bir claim $0.01 (1 sent) turadi</i>",
-        "add_balance_usage": "Admin: /add_balance <user_id> <amount>", "add_spent_usage": "Admin: /add_spent <user_id> <amount>",
-        "balance_updated": "✅ {user_id} foydalanuvchi balansi +${amount}, yangi balans: ${balance}",
-        "spent_updated": "✅ {user_id} foydalanuvchi sarfi +${amount}, yangi sarf: ${spent}",
-        "invalid_amount": "❌ Noto'g'ri miqdor. Iltimos 0.1 va 100 orasida son kiriting.",
-        "user_not_found": "❌ Foydalanuvchi topilmadi.", "admin_only": "❌ Faqat admin buyrug'i.",
-        "referral_bonus": "🎉 Siz +16 claim oldingiz! Sizni {ref_id} taklif qildi.",
-        "referee_bonus": "🎉 Do'stingiz sizning link orqali kelib +8 claim oldi!",
-        "only_photo": "❌ Iltimos, to'lov skrinshotini RASM sifatida yuboring, matn emas.",
-    },
-    "ru": {
-        "main_title": "RIPPERBOT", "api_connected": "✅", "api_disconnected": "❌",
-        "live_log": "📡 ЖИВОЙ ЛОГ", "no_claims": "⏳ Пока нет клеймов...",
-        "crane_active_indicator": "✅", "crane_inactive_indicator": "⚠️",
-        "add_account": "➕ Добавить аккаунт", "back": "◀️ Назад", "control_panel": "Панель управления",
-        "claims": "клеймы", "balance": "💰 Баланс", "subscription": "💳 Подписка",
-        "invite_friend": "🎁 Пригласить друга", "settings": "⚙️ Настройки", "refresh": "🔄",
-        "active_accounts": "АКТИВНЫЕ АККАУНТЫ", "no_accounts": "Нет активных аккаунтов — + добавить",
-        "settings_title": "⚙️ Настройки", "api_key_label": "🔑 API ключ", "api_host_label": "🌐 API хост",
-        "api_key_not_set": "❌ Не установлен", "api_key_set": "✅", "settings_note": "У каждого пользователя свой API ключ.",
-        "language": "🌐 Язык", "select_language": "🌐 Выберите язык:", "language_changed": "✅ Язык изменён!",
-        "subscription_title": "💳 Подписка", "no_active_sub": "❌ Нет активной подписки",
-        "accounts_count": "📊 Аккаунтов: 0", "claims_count": "📊 Клеймов: 0", "available_plans": "✅ Доступные планы:",
-        "monthly": "📆 Месячный – $15/мес", "monthly_desc": "├ 50 аккаунтов (любой сайт)\n└ Безлимитные клеймы",
-        "claim_pack": "🎫 Пакет клеймов – $1/1200 клеймов", "claim_pack_desc": "├ Безлимит аккаунтов\n└ 1200 клеймов",
-        "pay_with_crypto": "💎 Оплатить криптой", "select_crypto": "💎 Выберите криптовалюту\n\nПредпочитаемая монета:",
-        "bnb": "🟡 BNB (BEP-20)", "sol": "🟠 SOL", "ltc": "⚪ LTC", "ton": "💎 TON", "trx": "🔴 TRX (TRC-20)", "doge": "🐕 DOGE",
-        "wallet_address": "📍 Адрес кошелька:", "amounts": "💰 Введите любую сумму ($0.1 – $100 USD):",
-        "send_exact": "⚠️ Отправьте точно введённую сумму", "submit_txid": "📝 После оплаты нажмите Отправить скриншот",
-        "submit_txid_button": "📸 Отправить скриншот", "enter_amount": "💰 Введите сумму в USD (мин $0.1, макс $100):",
-        "enter_txid": "📸 Теперь отправьте скриншот оплаты (только фото):",
-        "deposit_request": "💸 Запрос пополнения от пользователя {user_id}\nСумма: ${amount}\nПодтверждение: {txid}",
-        "approve": "✅ Подтвердить", "reject": "❌ Отклонить",
-        "deposit_approved": "✅ Ваш депозит на сумму ${amount} подтверждён! Баланс обновлён.",
-        "deposit_rejected": "❌ Ваш запрос отклонён. Попробуйте снова.",
-        "txid_received": "📸 Скриншот получен! Администратор проверит и пополнит баланс.",
-        "cancel": "❌ Отмена", "skip_cookies": "⏭️ Пропустить Cookies", "skip_ua": "⏭️ Пропустить UA",
-        "add_account_title": "Добавить аккаунт — {crane}", "label": "🏷️ Метка: {label}",
-        "send_email": "📧 Отправьте email аккаунта:", "cancel_abort": "/cancel для отмены.",
-        "email_received": "📧 Email: <code>{email}</code>", "send_password": "🔑 Теперь отправьте пароль:",
-        "password_ok": "🔑 Пароль: ✅", "cookies_optional": "🍪 Cookies (обязательно — отправьте cookies):",
-        "cookies_instruction": "F12 > Консоль > <code>document.cookie</code>",
-        "cookies_skipped": "🍪 Cookies: Обязательно", "ua_optional": "🌐 User-Agent (обязательно — отправьте UA):",
-        "ua_instruction": "F12 > Консоль > <code>navigator.userAgent</code>",
-        "cookies_received": "🍪 Cookies: ✅ ({len} симв.)", "account_added": "✅ <b>Аккаунт добавлен!</b>",
-        "account_num": "{crane} #{num}", "cookies_status": "🍪 {status}", "ua_status": "🌐 UA: {status}",
-        "main_menu": "🏠 Главное меню", "cancelled": "❌ Отменено.", "updated": "♻️ Обновлено!",
-        "not_found": "Не найдено!", "api_key_prompt": "🔑 <b>XEvil API ключ</b>\n\nОтправьте ваш API ключ:\n\n/cancel для отмены.",
-        "api_host_prompt": "🌐 <b>API хост</b>\n\nОтправьте API хост (например <code>sctg.xyz</code>):\n\n/cancel для отмены.",
-        "referral_title": "🎁🎁 <b>Реферальная система</b>", "your_link": "🔗 <b>Ваша реферальная ссылка:</b>",
-        "share_text": "📢 <b>Поделитесь ссылкой с друзьями!</b>\n├ Вы получаете: <b>+16 клеймов</b>\n└ Друг получает: <b>+8 клеймов</b>",
-        "friends_joined": "👥 <b>Присоединилось друзей:</b> {count}", "bonus_earned": "📊 <b>Заработано бонусов:</b> {bonus}",
-        "share_button": "📨 Поделиться с другом", "balance_title": "💰 <b>Мой баланс</b>",
-        "current_balance": "💵 Текущий баланс: <b>${balance}</b>", "total_deposited": "📥 Всего пополнено: <b>${deposited}</b>",
-        "total_spent": "📤 Потрачено на капчу: <b>${spent}</b>", "spent_note": "\n<i>Каждый клейм стоит $0.01 (1 цент)</i>",
-        "add_balance_usage": "Admin: /add_balance <user_id> <amount>", "add_spent_usage": "Admin: /add_spent <user_id> <amount>",
-        "balance_updated": "✅ Баланс пользователя {user_id} +${amount}, новый баланс: ${balance}",
-        "spent_updated": "✅ Расход пользователя {user_id} +${amount}, новый расход: ${spent}",
-        "invalid_amount": "❌ Неверная сумма. Введите число от 0.1 до 100.",
-        "user_not_found": "❌ Пользователь не найден.", "admin_only": "❌ Только для администратора.",
-        "referral_bonus": "🎉 Вы получили +16 клеймов! Вас пригласил {ref_id}",
-        "referee_bonus": "🎉 Ваш друг получил +8 клеймов за переход по вашей ссылке!",
-        "only_photo": "❌ Пожалуйста, отправьте ФОТО (скриншот) оплаты, а не текст.",
+        "cookies_received": "🍪 Cookies: ✅ ({len} belgi)",
+        "account_added": "✅ <b>Hisob qo‘shildi!</b>",
+        "account_num": "{crane} #{num}",
+        "cookies_status": "🍪 {status}",
+        "ua_status": "🌐 UA: {status}",
+        "main_menu": "🏠 Bosh menyu",
+        "cancelled": "❌ Bekor qilindi.",
+        "updated": "♻️ Yangilandi!",
+        "not_found": "Topilmadi!",
+        "api_key_prompt": "🔑 <b>API kaliti</b>\n\nAPI kalitingizni yuboring:\n\n/cancel bekor qilish.",
+        "api_host_prompt": "🌐 <b>API host</b>\n\nAPI hostni yuboring (masalan <code>sctg.xyz</code>):",
+        "claim_started": "⏳ Claim boshlandi...",
+        "claim_success": "✅ Claim muvaffaqiyatli!",
+        "claim_failed": "❌ Claim muvaffaqiyatsiz",
+        "no_active_accounts": "⚠️ Claim qilish uchun faol hisob yo‘q.",
+        "claim_log": "📌 Claim logi:\n{log}",
+        "auto_claim_started": "🔄 24/7 avtomatik claim ishga tushdi!",
+        "auto_claim_stopped": "⏹ 24/7 avtomatik claim to‘xtatildi.",
+        "toggle_auto": "🔄 24/7 yoqish/o‘chirish",
+        "auto_on": "✅ 24/7 yoqilgan",
+        "auto_off": "❌ 24/7 o‘chirilgan",
     }
 }
 
-def get_text(user_id: int, key: str, **kwargs) -> str:
-    lang = USER_SETTINGS.get(user_id, {}).get("language", "en")
-    text = TEXTS.get(lang, TEXTS["en"]).get(key, key)
+LANG = "uz"
+
+def get_text(key: str, **kwargs) -> str:
+    text = TEXTS[LANG].get(key, key)
     if kwargs:
-        try:
-            return text.format(**kwargs)
-        except KeyError:
-            return text
+        return text.format(**kwargs)
     return text
 
-# ========== PERSISTENT STORAGE ==========
-DATA_DIR = "data"
-USER_SETTINGS_FILE = os.path.join(DATA_DIR, "user_settings.json")
-CRANES_FILE = os.path.join(DATA_DIR, "cranes.json")
+# ─── Kranlar (LitePick va TronPick) ────────────────────────────────────────
+CRANES = [
+    {
+        "name": "LitePick",
+        "emoji": "🌕",
+        "host": "https://litepick.io/",
+        "captcha_type": "turnstile",
+        "sitekey": "0x4AAAAAAA0-UWDHOKP0OrgS",
+        "active": False,
+        "claims": 0,
+        "max_claims": "∞",
+        "balance": "0",
+        "accounts": []
+    },
+    {
+        "name": "TronPick",
+        "emoji": "🔴",
+        "host": "https://tronpick.io/",
+        "captcha_type": "recaptcha",
+        "sitekey": "6LeBFBclAAAAANoZIrwXU1cPgYDDM7f1ehHpzXWj",
+        "active": False,
+        "claims": 0,
+        "max_claims": "∞",
+        "balance": "0",
+        "accounts": []
+    }
+]
 
-def ensure_data_dir():
-    os.makedirs(DATA_DIR, exist_ok=True)
+API_STATE = {
+    "connected": False,
+    "domain": "sctg.xyz",
+    "plan": "Trial",
+    "accounts": 0,
+    "total_claims": 0,
+}
 
-def load_user_settings():
-    ensure_data_dir()
-    if os.path.exists(USER_SETTINGS_FILE):
-        with open(USER_SETTINGS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
-
-def save_user_settings():
-    ensure_data_dir()
-    with open(USER_SETTINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(USER_SETTINGS, f, indent=2, ensure_ascii=False)
-
-def load_cranes():
-    ensure_data_dir()
-    if os.path.exists(CRANES_FILE):
-        with open(CRANES_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return [
-        {"name": "TronPick", "emoji": "🔴",  "active": False, "multiplier": None, "claims": 0, "max_claims": "∞", "balance": 0, "accounts": []},
-        {"name": "LitePick", "emoji": "🌕",  "active": False, "multiplier": None, "claims": 0, "max_claims": "∞", "balance": 0, "accounts": []},
-        {"name": "DogePick", "emoji": "🐕",  "active": False, "multiplier": None, "claims": 0, "max_claims": "∞", "balance": 0, "accounts": []},
-        {"name": "PolPick",  "emoji": "🪙",  "active": False, "multiplier": None, "claims": 0, "max_claims": "∞", "balance": 0, "accounts": []},
-        {"name": "BnbPick",  "emoji": "🟡",  "active": False, "multiplier": None, "claims": 0, "max_claims": "∞", "balance": 0, "accounts": []},
-        {"name": "SolPick",  "emoji": "☀️",  "active": False, "multiplier": None, "claims": 0, "max_claims": "∞", "balance": 0, "accounts": []},
-        {"name": "SuiPick",  "emoji": "💧",  "active": False, "multiplier": None, "claims": 0, "max_claims": "∞", "balance": 0, "accounts": []},
-        {"name": "UsdPick",  "emoji": "💵",  "active": False, "multiplier": None, "claims": 0, "max_claims": "∞", "balance": 0, "accounts": []},
-        {"name": "TonPick",  "emoji": "💎",  "active": False, "multiplier": None, "claims": 0, "max_claims": "∞", "balance": 0, "accounts": []},
-        {"name": "BchPick",  "emoji": "🟤",  "active": False, "multiplier": None, "claims": 0, "max_claims": "∞", "balance": 0, "accounts": []},
-    ]
-
-def save_cranes():
-    ensure_data_dir()
-    with open(CRANES_FILE, "w", encoding="utf-8") as f:
-        json.dump(CRANES, f, indent=2, ensure_ascii=False)
-
-# ========== GLOBAL VARIABLES ==========
-USER_SETTINGS = load_user_settings()
-CRANES = load_cranes()
-API_STATE = {"connected": False, "domain": "sctg.xyz", "plan": "Trial", "accounts": 0, "total_claims": 0}
 LIVE_LOG = {"crane_emoji": "", "crane_name": "", "log_text": ""}
-BOT_USERNAME = ""
-PENDING_DEPOSITS = {}
-running_claimers = {}
+MY_SETTINGS = {"api_key": "", "api_host": "sctg.xyz"}
 
-# ========== HELPER FUNCTIONS ==========
+# 24/7 holati
+AUTO_CLAIM = {
+    "enabled": False,
+    "task": None,
+}
+
+# ─── FSM States ──────────────────────────────────────────────────────────────
+class AddAccount(StatesGroup):
+    email    = State()
+    password = State()
+    cookies  = State()
+    ua       = State()
+
+class SettingsState(StatesGroup):
+    api_key  = State()
+    api_host = State()
+
+# ─── Helperlar ───────────────────────────────────────────────────────────────
 def get_crane(name: str):
     return next((c for c in CRANES if c["name"] == name), None)
 
-def cancel_keyboard(user_id: int):
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_add")]])
+def cancel_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=get_text("cancel"), callback_data="cancel_add")]
+    ])
 
-def get_csrf_from_cookie(cookie_str: str) -> Optional[str]:
-    if not cookie_str:
+def skip_cookies_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=get_text("cancel"), callback_data="cancel_add")],
+        [InlineKeyboardButton(text=get_text("skip_cookies"), callback_data="skip_cookies")],
+    ])
+
+def skip_ua_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=get_text("cancel"), callback_data="cancel_add")],
+        [InlineKeyboardButton(text=get_text("skip_ua"), callback_data="skip_ua")],
+    ])
+
+# ─── PICK CLIENT (LitePick va TronPick uchun) ─────────────────────────────
+class PickClient:
+    def __init__(self, host: str, cookie: str, user_agent: str,
+                 captcha_type: str, sitekey: str,
+                 api_key: str = "", api_host: str = "sctg.xyz"):
+        self.host = host.rstrip('/')
+        self.cookie = cookie
+        self.user_agent = user_agent
+        self.captcha_type = captcha_type   # 'turnstile' yoki 'recaptcha'
+        self.sitekey = sitekey
+        self.api_key = api_key
+        self.api_host = api_host
+
+        self.scraper = cloudscraper.create_scraper()
+        self.scraper.headers.update({
+            "User-Agent": user_agent,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+        })
+        self.scraper.cookies.update(self._parse_cookie(cookie))
+
+    def _parse_cookie(self, cookie_str: str) -> Dict:
+        cookies = {}
+        for item in cookie_str.split(';'):
+            item = item.strip()
+            if '=' in item:
+                key, val = item.split('=', 1)
+                cookies[key] = val
+        return cookies
+
+    def _headers(self) -> Dict:
+        return {
+            "Host": self.host.replace('https://', ''),
+            "Cookie": self.cookie,
+            "X-Requested-With": "XMLHttpRequest",
+            "User-Agent": self.user_agent,
+        }
+
+    def _get_csrf(self) -> str:
+        for item in self.cookie.split(';'):
+            item = item.strip()
+            if item.startswith("csrf_cookie_name="):
+                return item.split('=', 1)[1]
+        return ""
+
+    def dashboard(self) -> Dict:
+        url = f"{self.host}/"
+        resp = self.scraper.get(url, headers=self._headers())
+        html = resp.text
+
+        data = {
+            "cloudflare": 1 if "Just a moment..." in html else 0,
+            "Login": 1 if "login_button" not in html else 0
+        }
+        match = re.search(r'&username=([^&]+)', html)
+        data["Username"] = match.group(1) if match else "Unknown"
+        match = re.search(r'class="drop_down_header_text user_balance">([^<]+)<', html)
+        data["Balance"] = match.group(1).strip() if match else "0"
+        match = re.search(r'Your level is  <b>([^<]+)</b>', html)
+        level = match.group(1) if match else "0"
+        match2 = re.search(r'aria-valuemax="100">([^<]+)<', html)
+        progress = match2.group(1).strip() if match2 else "0%"
+        data["Level"] = f"{level} {progress}"
+        matches = re.findall(r'<b id="(total_wagered|wagering_target)">([^<]+)</b>', html)
+        w_data = {k: v for k, v in matches}
+        data["Total Wagered"] = w_data.get("total_wagered", "0")
+        data["Wagering Target"] = w_data.get("wagering_target", "0")
+        return data
+
+    def _solve_captcha(self, pageurl: str) -> Optional[str]:
+        if not self.api_key:
+            return None
+        # Provider: multibot yoki xevil
+        if "multibot" in self.api_host.lower():
+            base_in = "http://api.multibot.in/in.php"
+            base_res = "http://api.multibot.in/res.php"
+            key = self.api_key
+        else:
+            base_in = f"https://{self.api_host}/in.php"
+            base_res = f"https://{self.api_host}/res.php"
+            key = f"{self.api_key}|SOFTID1204538927"
+
+        # Metodni aniqlash
+        method_map = {
+            "turnstile": "turnstile",
+            "recaptcha": "userrecaptcha",
+            "hcaptcha": "hcaptcha"
+        }
+        method = method_map.get(self.captcha_type, "turnstile")
+
+        params = {
+            "key": key,
+            "method": method,
+            "pageurl": pageurl,
+            "sitekey": self.sitekey,
+            "json": 1
+        }
+        try:
+            resp = requests.get(base_in, params=params, timeout=30)
+            data = resp.json()
+        except Exception as e:
+            logging.error(f"Captcha in_api error: {e}")
+            return None
+
+        if not data.get("status"):
+            logging.error(f"Captcha error: {data}")
+            return None
+
+        captcha_id = data.get("request")
+        if not captcha_id:
+            return None
+
+        for _ in range(30):
+            time.sleep(3)
+            res_params = {"key": key, "action": "get", "id": captcha_id, "json": 1}
+            try:
+                resp2 = requests.get(base_res, params=res_params, timeout=30)
+                res_data = resp2.json()
+            except Exception as e:
+                logging.error(f"Captcha res error: {e}")
+                continue
+
+            if res_data.get("status"):
+                return res_data.get("request")
+            if res_data.get("request") == "CAPCHA_NOT_READY":
+                continue
+            else:
+                logging.error(f"Captcha final error: {res_data}")
+                return None
         return None
-    parts = cookie_str.split(';')
-    for part in parts:
-        part = part.strip()
-        if part.startswith("csrf_cookie_name="):
-            return part.split("=", 1)[1]
-    return None
 
-def build_message_text(user_id: int) -> str:
+    def claim_hourly(self) -> Dict:
+        url = f"{self.host}/faucet.php"
+        resp = self.scraper.get(url, headers=self._headers())
+        html = resp.text
+
+        if "Just a moment..." in html:
+            return {"success": False, "msg": "Cloudflare detected"}
+
+        if "select_hourly_faucet" in html:
+            tmr_match = re.search(r'select_hourly_faucet\|([^|]+)\|', html)
+            if tmr_match:
+                return {"success": False, "msg": f"Kuting {tmr_match.group(1)} soniya"}
+
+        csrf = self._get_csrf()
+
+        # Captcha yechish
+        cap_token = None
+        if self.captcha_type in ("turnstile", "recaptcha", "hcaptcha"):
+            cap_token = self._solve_captcha(url)
+
+        if not cap_token:
+            return {"success": False, "msg": "Captcha yechilmadi"}
+
+        # POST ma'lumotlarini tayyorlash
+        data = {
+            "action": "claim_hourly_faucet",
+            "csrf_test_name": csrf,
+        }
+        if self.captcha_type == "hcaptcha":
+            data["h-captcha-response"] = cap_token
+            data["g-recaptcha-response"] = "null"
+        elif self.captcha_type == "recaptcha":
+            data["g-recaptcha-response"] = cap_token
+            data["h-captcha-response"] = "null"
+        elif self.captcha_type == "turnstile":
+            data["c_captcha_response"] = cap_token
+            data["clbt"] = "1"
+            data["g-recaptcha-response"] = "null"
+            data["h-captcha-response"] = "null"
+        else:
+            data["g-recaptcha-response"] = "null"
+            data["h-captcha-response"] = "null"
+
+        post_headers = self._headers()
+        post_headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+        process_url = f"{self.host}/process.php"
+        resp2 = self.scraper.post(process_url, data=data, headers=post_headers)
+        try:
+            result = resp2.json()
+        except:
+            return {"success": False, "msg": "Noto'g'ri javob"}
+
+        if result.get("ret"):
+            return {"success": True, "msg": result.get("mes", "Claim qilindi"), "num": result.get("num")}
+        else:
+            return {"success": False, "msg": result.get("mes", "Noma'lum xato")}
+
+    def claim_bonus(self) -> Dict:
+        url = f"{self.host}/faucet.php"
+        resp = self.scraper.get(url, headers=self._headers())
+        html = resp.text
+
+        if "Just a moment..." in html:
+            return {"success": False, "msg": "Cloudflare detected"}
+
+        bonus_match = re.search(r'<span id="free_spins">([^<]+)</span>', html)
+        if not bonus_match or bonus_match.group(1).strip() == "0":
+            return {"success": False, "msg": "Bonus mavjud emas"}
+
+        csrf = self._get_csrf()
+        data = {"action": "claim_bonus_faucet", "csrf_test_name": csrf}
+        post_headers = self._headers()
+        post_headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+        process_url = f"{self.host}/process.php"
+        resp2 = self.scraper.post(process_url, data=data, headers=post_headers)
+        try:
+            result = resp2.json()
+        except:
+            return {"success": False, "msg": "Noto'g'ri javob"}
+
+        if result.get("ret"):
+            return {"success": True, "msg": result.get("mes", "Bonus olindi"), "num": result.get("num")}
+        else:
+            return {"success": False, "msg": result.get("mes", "Noma'lum xato")}
+
+# ─── UI / Menyu ──────────────────────────────────────────────────────────────
+def build_message_text() -> str:
     lines = []
     for c in CRANES:
         name_upper = c["name"].upper()
         if c["active"]:
-            mult = f" | 🟢 {c['multiplier']}" if c["multiplier"] else ""
-            line = f"{c['emoji']} {name_upper} ✅ [∞]{mult} ({c['claims']}/{c['max_claims']})"
+            active_mark = get_text("crane_active")
+            line = f"{c['emoji']} {name_upper} {active_mark} [∞] ({c['claims']}/{c['max_claims']})"
         else:
-            line = f"{c['emoji']} {name_upper} ⚠️ [∞] | ▫️ (0/{c['max_claims']})"
+            inactive_mark = get_text("crane_inactive")
+            line = f"{c['emoji']} {name_upper} {inactive_mark} [∞] (0/{c['max_claims']})"
         lines.append(line)
-    text = "\n".join(lines) + "\n\n"
-    api_icon = get_text(user_id, "api_connected") if API_STATE["connected"] else get_text(user_id, "api_disconnected")
+
+    text = "\n".join(lines)
+    text += "\n\n"
+
+    api_icon = get_text("api_connected") if API_STATE["connected"] else get_text("api_disconnected")
     text += f"🔑 API: {api_icon} ({API_STATE['domain']})\n"
+
     if API_STATE["connected"] and API_STATE["accounts"] != 0:
         acc_str = "∞" if API_STATE["accounts"] == -1 else str(API_STATE["accounts"])
         claims_str = str(API_STATE["total_claims"]) if API_STATE["total_claims"] > 0 else "0"
         text += f"📓 {API_STATE['plan']} | {acc_str} accounts | {claims_str} claims\n"
-    text += f"\n{get_text(user_id, 'live_log')}\n────────────────\n"
+
+    auto_status = get_text("auto_on") if AUTO_CLAIM["enabled"] else get_text("auto_off")
+    text += f"\n🔄 24/7: {auto_status}\n"
+
+    text += f"\n{get_text('live_log')}\n────────────────\n"
     if LIVE_LOG["log_text"]:
-        text += f"{LIVE_LOG['crane_emoji']} {LIVE_LOG['crane_name'].upper()}\n{LIVE_LOG['log_text']}"
+        text += f"{LIVE_LOG['crane_emoji']} {LIVE_LOG['crane_name'].upper()}\n"
+        text += LIVE_LOG["log_text"]
     else:
-        text += get_text(user_id, "no_claims")
+        text += get_text("no_claims")
+
     return text
 
-def build_keyboard(user_id: int) -> InlineKeyboardMarkup:
+def build_keyboard() -> InlineKeyboardMarkup:
     buttons = []
     row = []
     for c in CRANES:
-        icon = "🟢" if c["active"] else "⚠️"
+        icon = get_text("crane_active") if c["active"] else get_text("crane_inactive")
         btn = InlineKeyboardButton(text=f"{icon} {c['name']}", callback_data=f"crane_{c['name']}")
         row.append(btn)
         if len(row) == 2:
@@ -299,484 +438,376 @@ def build_keyboard(user_id: int) -> InlineKeyboardMarkup:
             row = []
     if row:
         buttons.append(row)
-    buttons.append([InlineKeyboardButton(text=get_text(user_id, "balance"), callback_data="balance")])
-    buttons.append([InlineKeyboardButton(text=get_text(user_id, "subscription"), callback_data="subscription")])
-    buttons.append([InlineKeyboardButton(text=get_text(user_id, "invite_friend"), callback_data="invite")])
-    buttons.append([InlineKeyboardButton(text=get_text(user_id, "settings"), callback_data="settings"), InlineKeyboardButton(text=get_text(user_id, "refresh"), callback_data="refresh")])
+
+    buttons.append([InlineKeyboardButton(text=get_text("balance"), callback_data="balance")])
+    buttons.append([InlineKeyboardButton(text=get_text("subscription"), callback_data="subscription")])
+    buttons.append([InlineKeyboardButton(text=get_text("invite_friend"), callback_data="invite")])
+    buttons.append([
+        InlineKeyboardButton(text=get_text("settings"), callback_data="settings"),
+        InlineKeyboardButton(text=get_text("refresh"), callback_data="refresh"),
+    ])
+    buttons.append([InlineKeyboardButton(text=get_text("toggle_auto"), callback_data="toggle_auto")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def build_crane_keyboard(crane_name: str, user_id: int):
-    crane = get_crane(crane_name)
-    accounts = crane.get("accounts", []) if crane else []
-    buttons = []
-    for idx, acc in enumerate(accounts):
-        key = f"{user_id}_{crane_name}_{idx}"
-        is_running = key in running_claimers and not running_claimers[key].done()
-        btn_text = f"⏹️ Stop {acc['label']}" if is_running else f"▶️ Start {acc['label']}"
-        buttons.append([InlineKeyboardButton(text=btn_text, callback_data=f"toggle_{crane_name}_{idx}")])
-    buttons.append([InlineKeyboardButton(text=get_text(user_id, "add_account"), callback_data=f"add_account_{crane_name}")])
-    buttons.append([InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="back_main")])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
+def build_crane_keyboard(crane_name: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=get_text("add_account"), callback_data=f"add_account_{crane_name}")],
+        [InlineKeyboardButton(text=get_text("claim_now"), callback_data=f"claim_crane_{crane_name}")],
+        [InlineKeyboardButton(text=get_text("back"), callback_data="back_main")],
+    ])
 
-def crane_panel_text(crane: dict, user_id: int) -> str:
+def crane_panel_text(crane: dict) -> str:
     accounts = crane.get("accounts", [])
     acc_count = len(accounts)
     active_count = sum(1 for a in accounts if a.get("active", False))
-    text = f"{crane['emoji']} <b>{crane['name']} — {get_text(user_id, 'control_panel')}</b>\n📊 {crane['claims']} {get_text(user_id, 'claims')} | 💰 {crane['balance']}\n▶️ <b>{get_text(user_id, 'active_accounts')} ({active_count}/{acc_count}):</b>\n"
+
+    text = (
+        f"{crane['emoji']} <b>{crane['name']} — {get_text('control_panel')}</b>\n"
+        f"📊 {crane['claims']} {get_text('claims')} | 💰 {crane['balance']}\n"
+        f"▶️ <b>{get_text('active_accounts')} ({active_count}/{acc_count}):</b>\n"
+    )
     if accounts:
-        for idx, acc in enumerate(accounts):
+        for acc in accounts:
             status = "🟢" if acc.get("active") else "🔴"
             text += f"  {status} {acc['label']} — {acc['email']}\n"
     else:
-        text += f"<i>{get_text(user_id, 'no_accounts')}</i>"
+        text += f"<i>{get_text('no_accounts')}</i>"
     return text
 
-def build_settings_text(user_id: int) -> str:
-    s = USER_SETTINGS.get(user_id, {})
-    api_key = s.get("api_key", "")
-    api_host = s.get("api_host", "sctg.xyz")
-    key_display = f"{get_text(user_id, 'api_key_set')} {api_key[:8]}..." if api_key else get_text(user_id, "api_key_not_set")
-    return f"{get_text(user_id, 'settings_title')}\n\n{get_text(user_id, 'api_key_label')}: {key_display}\n{get_text(user_id, 'api_host_label')}: <a href='http://{api_host}'>{api_host}</a>\n\n<i>{get_text(user_id, 'settings_note')}</i>"
+def build_settings_text() -> str:
+    api_key = MY_SETTINGS.get("api_key", "")
+    api_host = MY_SETTINGS.get("api_host", "sctg.xyz")
 
-def build_settings_keyboard(user_id: int):
+    if api_key:
+        key_display = f"{get_text('api_key_set')} {api_key[:8]}..."
+    else:
+        key_display = get_text("api_key_not_set")
+
+    return (
+        f"{get_text('settings_title')}\n\n"
+        f"{get_text('api_key_label')}: {key_display}\n"
+        f"{get_text('api_host_label')}: <a href='http://{api_host}'>{api_host}</a>\n\n"
+        f"<i>{get_text('settings_note')}</i>"
+    )
+
+def build_settings_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=get_text(user_id, "api_key_label"), callback_data="set_api_key")],
-        [InlineKeyboardButton(text=get_text(user_id, "api_host_label"), callback_data="set_api_host")],
-        [InlineKeyboardButton(text=get_text(user_id, "language"), callback_data="set_language")],
-        [InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="back_main")]
+        [InlineKeyboardButton(text=get_text("api_key_label"), callback_data="set_api_key")],
+        [InlineKeyboardButton(text=get_text("api_host_label"), callback_data="set_api_host")],
+        [InlineKeyboardButton(text=get_text("back"), callback_data="back_main")],
     ])
 
-# ========== CLAIMER (aiohttp bilan) ==========
-CRANE_CONFIG = {
-    "TronPick": {
-        "host": "https://tronpick.io/",
-        "captcha_type": "recaptcha",
-        "sitekey": "6LeBFBclAAAAANoZIrwXU1cPgYDDM7f1ehHpzXWj",
-        "post_field": "g-recaptcha-response",
-        "action": "claim_hourly_faucet",
-        "use_clbt": False,
-    },
-    "LitePick": {
-        "host": "https://litepick.io/",
-        "captcha_type": "turnstile",
-        "sitekey": "0x4AAAAAAA0-UWDHOKP0OrgS",
-        "post_field": "c_captcha_response",
-        "action": "claim_hourly_faucet",
-        "use_clbt": True,
-    },
-    "DogePick": {
-        "host": "https://dogepick.io/",
-        "captcha_type": "recaptcha",
-        "sitekey": "6LfVA0obAAAAAI8bLZBdotcvg-ms4heUAP1ebfjO",
-        "post_field": "g-recaptcha-response",
-        "action": "claim_hourly_faucet",
-        "use_clbt": True,
-    },
-    "PolPick": {
-        "host": "https://polpick.io/",
-        "captcha_type": "recaptcha",
-        "sitekey": "6LcHOR8rAAAAAFBzOKHRFY6yLoilRi-JyGnQdUtq",
-        "post_field": "g-recaptcha-response",
-        "action": "claim_hourly_faucet",
-        "use_clbt": True,
-    },
-    "BnbPick": {
-        "host": "https://bnbpick.io/",
-        "captcha_type": "turnstile",
-        "sitekey": "0x4AAAAAAA0_O3uScCqtpqXl",
-        "post_field": "c_captcha_response",
-        "action": "claim_hourly_faucet",
-        "use_clbt": True,
-    },
-    "SolPick": {
-        "host": "https://solpick.io/",
-        "captcha_type": "recaptcha",
-        "sitekey": "6LdfNx8rAAAAAIkedgGnuX6TIRANDEDA2fsIjx3s",
-        "post_field": "g-recaptcha-response",
-        "action": "claim_hourly_faucet",
-        "use_clbt": False,
-    },
-    "SuiPick": {
-        "host": "https://suipick.io/",
-        "captcha_type": "turnstile",
-        "sitekey": "0x4AAAAAABgtwLBJbn9NePjw",
-        "post_field": "c_captcha_response",
-        "action": "claim_hourly_faucet",
-        "use_clbt": False,
-    },
-    "TonPick": {
-        "host": "https://tonpick.game/",
-        "captcha_type": "turnstile",
-        "sitekey": "0x4AAAAAAA1JQuZADVDIzQ65",
-        "post_field": "c_captcha_response",
-        "action": "claim_hourly_faucet",
-        "use_clbt": True,
-    },
-    "BchPick": {
-        "host": "https://bchpick.io/",
-        "captcha_type": "turnstile",
-        "sitekey": "0x4AAAAAADexuS24rGq6WGDh",
-        "post_field": "c_captcha_response",
-        "action": "claim_hourly_faucet",
-        "use_clbt": True,
-    },
-}
-
-class XevilSolver:
-    def __init__(self, api_key: str):
-        self.api_key = f"{api_key}|SOFTID1204538927"
-        self.base_url = "https://sctg.xyz/"
-
-    async def solve_turnstile(self, sitekey: str, pageurl: str) -> Optional[str]:
-        return await self._solve("turnstile", sitekey=sitekey, pageurl=pageurl)
-
-    async def solve_recaptcha_v2(self, sitekey: str, pageurl: str) -> Optional[str]:
-        return await self._solve("userrecaptcha", sitekey=sitekey, pageurl=pageurl)
-
-    async def _solve(self, method: str, **kwargs) -> Optional[str]:
-        async with aiohttp.ClientSession() as session:
-            params = {"key": self.api_key, "json": 1, "method": method, **kwargs}
-            try:
-                async with session.get(self.base_url + "in.php", params=params) as resp:
-                    data = await resp.json()
-                    if not data.get("status"):
-                        logging.error(f"Xevil in.php error: {data}")
-                        return None
-                    captcha_id = data["request"]
-            except Exception as e:
-                logging.error(f"Xevil request error: {e}")
-                return None
-
-            for _ in range(30):
-                await asyncio.sleep(3)
-                try:
-                    async with session.get(self.base_url + "res.php", params={
-                        "key": self.api_key, "action": "get", "id": captcha_id, "json": 1
-                    }) as resp:
-                        data = await resp.json()
-                        if data.get("status"):
-                            return data["request"]
-                        if data.get("request") != "CAPCHA_NOT_READY":
-                            logging.error(f"Xevil error: {data}")
-                            return None
-                except Exception:
-                    continue
-            return None
-
-class FaucetClaimer:
-    def __init__(self, user_id: int, crane_name: str, account_index: int,
-                 cookie: str, user_agent: str, api_key: str, bot: Bot):
-        self.user_id = user_id
-        self.crane_name = crane_name
-        self.account_index = account_index
-        self.cookie = cookie
-        self.user_agent = user_agent
-        self.solver = XevilSolver(api_key)
-        self.bot = bot
-        self._stop = False
-
-    def stop(self):
-        self._stop = True
-
-    async def run(self):
-        config = CRANE_CONFIG.get(self.crane_name)
-        if not config:
-            await self.bot.send_message(self.user_id, f"❌ No configuration for {self.crane_name}")
-            return
-
-        host = config["host"]
-        sitekey = config["sitekey"]
-        captcha_type = config["captcha_type"]
-        post_field = config["post_field"]
-        action = config["action"]
-        use_clbt = config.get("use_clbt", False)
-
-        headers = {
-            "Host": host.split("//")[1].rstrip("/"),
-            "Cookie": self.cookie,
-            "X-Requested-With": "XMLHttpRequest",
-            "User-Agent": self.user_agent,
-        }
-
-        async with aiohttp.ClientSession() as session:
-            while not self._stop:
-                try:
-                    await self.bot.send_message(self.user_id, f"🔄 {self.crane_name} claim starting...")
-
-                    # 1. CSRF token olish
-                    csrf = get_csrf_from_cookie(self.cookie)
-                    if not csrf:
-                        await self.bot.send_message(self.user_id, "❌ csrf_cookie_name not found. Check cookie.")
-                        break
-
-                    # 2. Captcha yechish
-                    await self.bot.send_message(self.user_id, f"🔐 Solving {captcha_type}...")
-                    if captcha_type == "turnstile":
-                        cap = await self.solver.solve_turnstile(sitekey, host + "faucet.php")
-                    else:
-                        cap = await self.solver.solve_recaptcha_v2(sitekey, host + "faucet.php")
-
-                    if not cap:
-                        await self.bot.send_message(self.user_id, "❌ Captcha failed. Check API balance.")
-                        break
-
-                    # 3. POST soʻrovi (PHP dagi barcha parametrlar bilan)
-                    data = {
-                        "action": action,
-                        "csrf_test_name": csrf,
-                        post_field: cap,
-                        "g-recaptcha-response": "null",
-                        "h-captcha-response": "null",
-                        "captcha": "",
-                        "ft": "",
-                    }
-                    if use_clbt:
-                        data["clbt"] = "1"
-
-                    # PHP botdagi kabi referer qoʻshish
-                    headers["Referer"] = host + "faucet.php"
-
-                    async with session.post(host + "process.php", data=data, headers=headers) as resp:
-                        # Debug: nima kelganini koʻrish (agar xato boʻlsa)
-                        if resp.status != 200:
-                            await self.bot.send_message(self.user_id, f"❌ HTTP {resp.status}")
-                            break
-                        try:
-                            result = await resp.json()
-                        except Exception as e:
-                            text = await resp.text()
-                            await self.bot.send_message(self.user_id, f"❌ Invalid JSON response (HTML). Session expired?")
-                            logging.error(f"JSON decode error: {e}\nResponse: {text[:500]}")
-                            break
-
-                        if result.get("ret"):
-                            reward = result.get("num", 0)
-                            await self.on_success(reward)
-                            await self.bot.send_message(self.user_id, f"✅ Claimed {reward} from {self.crane_name} (-$0.01)")
-                        else:
-                            error_msg = result.get("mes", "Unknown error")
-                            await self.bot.send_message(self.user_id, f"❌ Claim failed: {error_msg}")
-                            if "login" in error_msg.lower() or "expired" in error_msg.lower():
-                                await self.bot.send_message(self.user_id, "⚠️ Cookie expired. Re-add account.")
-                                break
-
-                    # 4. 1 soat kutish
-                    for _ in range(3600):
-                        if self._stop:
-                            break
-                        await asyncio.sleep(1)
-
-                except asyncio.CancelledError:
-                    break
-                except Exception as e:
-                    await self.bot.send_message(self.user_id, f"⚠️ Error: {str(e)}")
-                    await asyncio.sleep(60)
-
-    async def on_success(self, reward: float):
-        if self.user_id not in USER_SETTINGS:
-            USER_SETTINGS[self.user_id] = {"balance": 0, "total_spent": 0}
-        USER_SETTINGS[self.user_id]["balance"] = USER_SETTINGS[self.user_id].get("balance", 0) - 0.01
-        USER_SETTINGS[self.user_id]["total_spent"] = USER_SETTINGS[self.user_id].get("total_spent", 0) + 0.01
-        save_user_settings()
-
-        crane = get_crane(self.crane_name)
-        if crane:
-            crane["claims"] = crane.get("claims", 0) + 1
-            save_cranes()
-            LIVE_LOG["log_text"] = f"Claimed {reward} from {self.crane_name}"
-            LIVE_LOG["crane_emoji"] = crane["emoji"]
-            LIVE_LOG["crane_name"] = self.crane_name
-
-# ========== FSM STATES ==========
-class AddAccount(StatesGroup):
-    email = State()
-    password = State()
-    cookies = State()
-    ua = State()
-
-class SettingsState(StatesGroup):
-    api_key = State()
-    api_host = State()
-
-class DepositState(StatesGroup):
-    amount = State()
-    txid = State()
-
-# ========== BOT INSTANCE ==========
+# ─── Bot va Dispatcher ───────────────────────────────────────────────────────
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# ========== COMMANDS ==========
+# ─── 24/7 avtomatik claim ──────────────────────────────────────────────────
+async def auto_claim_loop():
+    """Har bir kran uchun har soatda claim qiladi"""
+    while AUTO_CLAIM["enabled"]:
+        for crane in CRANES:
+            if not crane["accounts"]:
+                continue
+            active_accounts = [acc for acc in crane["accounts"] if acc.get("active")]
+            if not active_accounts:
+                continue
+
+            api_key = MY_SETTINGS.get("api_key", "")
+            api_host = MY_SETTINGS.get("api_host", "sctg.xyz")
+
+            log_lines = []
+            for acc in active_accounts:
+                email = acc.get("email")
+                cookies = acc.get("cookies")
+                ua = acc.get("ua")
+                if not cookies or not ua:
+                    log_lines.append(f"❌ {email}: cookies/ua yo'q")
+                    continue
+
+                client = PickClient(
+                    host=crane["host"],
+                    cookie=cookies,
+                    user_agent=ua,
+                    captcha_type=crane["captcha_type"],
+                    sitekey=crane["sitekey"],
+                    api_key=api_key,
+                    api_host=api_host
+                )
+
+                # Hourly claim
+                result = await asyncio.to_thread(client.claim_hourly)
+                if result.get("success"):
+                    num = result.get("num", "?")
+                    msg = result.get("msg", "Claim qilindi")
+                    log_lines.append(f"✅ {email}: {msg} (num: {num})")
+                    crane["claims"] += 1
+                    try:
+                        dash = await asyncio.to_thread(client.dashboard)
+                        crane["balance"] = dash.get("Balance", "0")
+                    except:
+                        pass
+                else:
+                    log_lines.append(f"❌ {email}: {result.get('msg', 'failed')}")
+
+                # Bonus
+                bonus_result = await asyncio.to_thread(client.claim_bonus)
+                if bonus_result.get("success"):
+                    log_lines.append(f"🎁 {email}: bonus {bonus_result.get('msg', '')}")
+                    crane["claims"] += 1
+
+                await asyncio.sleep(2)
+
+            if log_lines:
+                LIVE_LOG["crane_emoji"] = crane["emoji"]
+                LIVE_LOG["crane_name"] = crane["name"]
+                LIVE_LOG["log_text"] = "\n".join(log_lines[-5:])
+                crane["active"] = True
+
+        await asyncio.sleep(3600)  # 1 soat
+
+# ─── Handlers ────────────────────────────────────────────────────────────────
 @dp.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
-    user_id = message.from_user.id
-    args = message.text.split()
-    referrer_id = None
-    if len(args) > 1 and args[1].startswith("ref_"):
-        try:
-            referrer_id = int(args[1].split("_")[1])
-        except:
-            pass
-
-    if user_id not in USER_SETTINGS:
-        USER_SETTINGS[user_id] = {
-            "language": "en",
-            "balance": 0.0,
-            "total_deposited": 0.0,
-            "total_spent": 0.0,
-            "referrals": [],
-            "referral_bonus": 0
-        }
-        if referrer_id and referrer_id in USER_SETTINGS and referrer_id != user_id:
-            USER_SETTINGS[referrer_id]["balance"] = USER_SETTINGS[referrer_id].get("balance", 0.0) + 0.16
-            USER_SETTINGS[referrer_id]["referral_bonus"] = USER_SETTINGS[referrer_id].get("referral_bonus", 0) + 16
-            USER_SETTINGS[referrer_id]["referrals"].append(user_id)
-            USER_SETTINGS[user_id]["balance"] = USER_SETTINGS[user_id].get("balance", 0.0) + 0.08
-            USER_SETTINGS[user_id]["referral_bonus"] = USER_SETTINGS[user_id].get("referral_bonus", 0) + 8
-            save_user_settings()
-            await bot.send_message(referrer_id, get_text(referrer_id, "referee_bonus"))
-            await message.answer(get_text(user_id, "referral_bonus", ref_id=referrer_id))
-        save_user_settings()
-
-    await message.answer(text=build_message_text(user_id), reply_markup=build_keyboard(user_id), parse_mode="HTML")
+    await message.answer(text=build_message_text(), reply_markup=build_keyboard(), parse_mode="HTML")
 
 @dp.message(Command("cancel"))
 async def cmd_cancel(message: Message, state: FSMContext):
-    user_id = message.from_user.id
     data = await state.get_data()
     crane_name = data.get("crane_name", "")
     await state.clear()
     if crane_name:
         crane = get_crane(crane_name)
         if crane:
-            await message.answer(text=crane_panel_text(crane, user_id), reply_markup=build_crane_keyboard(crane_name, user_id), parse_mode="HTML")
+            await message.answer(text=crane_panel_text(crane), reply_markup=build_crane_keyboard(crane_name), parse_mode="HTML")
             return
-    await message.answer(text=build_message_text(user_id), reply_markup=build_keyboard(user_id), parse_mode="HTML")
+    await message.answer(text=build_message_text(), reply_markup=build_keyboard(), parse_mode="HTML")
 
-@dp.message(Command("add_balance"))
-async def cmd_add_balance(message: Message):
-    if message.from_user.id != ADMIN_ID:
-        await message.reply(get_text(message.from_user.id, "admin_only"))
-        return
-    parts = message.text.split()
-    if len(parts) != 3:
-        await message.reply(get_text(ADMIN_ID, "add_balance_usage"))
-        return
-    try:
-        user_id = int(parts[1])
-        amount = float(parts[2])
-    except:
-        await message.reply(get_text(ADMIN_ID, "invalid_amount"))
-        return
-    if user_id not in USER_SETTINGS:
-        await message.reply(get_text(ADMIN_ID, "user_not_found"))
-        return
-    USER_SETTINGS[user_id]["balance"] = USER_SETTINGS[user_id].get("balance", 0.0) + amount
-    USER_SETTINGS[user_id]["total_deposited"] = USER_SETTINGS[user_id].get("total_deposited", 0.0) + amount
-    save_user_settings()
-    await message.reply(get_text(ADMIN_ID, "balance_updated", user_id=user_id, amount=amount, balance=USER_SETTINGS[user_id]["balance"]))
-
-@dp.message(Command("add_spent"))
-async def cmd_add_spent(message: Message):
-    if message.from_user.id != ADMIN_ID:
-        await message.reply(get_text(message.from_user.id, "admin_only"))
-        return
-    parts = message.text.split()
-    if len(parts) != 3:
-        await message.reply(get_text(ADMIN_ID, "add_spent_usage"))
-        return
-    try:
-        user_id = int(parts[1])
-        amount = float(parts[2])
-    except:
-        await message.reply(get_text(ADMIN_ID, "invalid_amount"))
-        return
-    if user_id not in USER_SETTINGS:
-        await message.reply(get_text(ADMIN_ID, "user_not_found"))
-        return
-    USER_SETTINGS[user_id]["total_spent"] = USER_SETTINGS[user_id].get("total_spent", 0.0) + amount
-    save_user_settings()
-    await message.reply(get_text(ADMIN_ID, "spent_updated", user_id=user_id, amount=amount, spent=USER_SETTINGS[user_id]["total_spent"]))
-
-# ========== CALLBACKS ==========
 @dp.callback_query(F.data == "refresh")
 async def cb_refresh(call: CallbackQuery, state: FSMContext):
-    user_id = call.from_user.id
     await state.clear()
     await call.message.delete()
-    await call.message.answer(text=build_message_text(user_id), reply_markup=build_keyboard(user_id), parse_mode="HTML")
-    await call.answer(get_text(user_id, "updated"))
+    await call.message.answer(text=build_message_text(), reply_markup=build_keyboard(), parse_mode="HTML")
+    await call.answer(get_text("updated"))
 
 @dp.callback_query(F.data == "back_main")
 async def cb_back_main(call: CallbackQuery, state: FSMContext):
-    user_id = call.from_user.id
     await state.clear()
     await call.message.delete()
-    await call.message.answer(text=build_message_text(user_id), reply_markup=build_keyboard(user_id), parse_mode="HTML")
+    await call.message.answer(text=build_message_text(), reply_markup=build_keyboard(), parse_mode="HTML")
     await call.answer()
 
 @dp.callback_query(F.data.startswith("crane_"))
 async def cb_crane(call: CallbackQuery):
-    user_id = call.from_user.id
     crane_name = call.data.replace("crane_", "")
     crane = get_crane(crane_name)
     if not crane:
-        await call.answer(get_text(user_id, "not_found"), show_alert=True)
+        await call.answer(get_text("not_found"), show_alert=True)
         return
     await call.message.delete()
-    await call.message.answer(text=crane_panel_text(crane, user_id), reply_markup=build_crane_keyboard(crane_name, user_id), parse_mode="HTML")
+    await call.message.answer(text=crane_panel_text(crane), reply_markup=build_crane_keyboard(crane_name), parse_mode="HTML")
     await call.answer()
 
+# ─── Toggle 24/7 ────────────────────────────────────────────────────────────
+@dp.callback_query(F.data == "toggle_auto")
+async def cb_toggle_auto(call: CallbackQuery):
+    global AUTO_CLAIM
+    if AUTO_CLAIM["enabled"]:
+        AUTO_CLAIM["enabled"] = False
+        if AUTO_CLAIM["task"]:
+            AUTO_CLAIM["task"].cancel()
+            try:
+                await AUTO_CLAIM["task"]
+            except asyncio.CancelledError:
+                pass
+            AUTO_CLAIM["task"] = None
+        await call.answer(get_text("auto_claim_stopped"))
+    else:
+        AUTO_CLAIM["enabled"] = True
+        AUTO_CLAIM["task"] = asyncio.create_task(auto_claim_loop())
+        await call.answer(get_text("auto_claim_started"))
+
+    await call.message.delete()
+    await call.message.answer(text=build_message_text(), reply_markup=build_keyboard(), parse_mode="HTML")
+
+# ─── Claim (bir martalik) ──────────────────────────────────────────────────
+@dp.callback_query(F.data.startswith("claim_crane_"))
+async def cb_claim_crane(call: CallbackQuery, state: FSMContext):
+    crane_name = call.data.replace("claim_crane_", "")
+    crane = get_crane(crane_name)
+    if not crane:
+        await call.answer(get_text("not_found"), show_alert=True)
+        return
+
+    active_accounts = [acc for acc in crane["accounts"] if acc.get("active")]
+    if not active_accounts:
+        await call.answer(get_text("no_active_accounts"), show_alert=True)
+        return
+
+    await call.answer(get_text("claim_started"))
+
+    api_key = MY_SETTINGS.get("api_key", "")
+    api_host = MY_SETTINGS.get("api_host", "sctg.xyz")
+
+    log_lines = []
+    for acc in active_accounts:
+        email = acc.get("email")
+        cookies = acc.get("cookies")
+        ua = acc.get("ua")
+        if not cookies or not ua:
+            log_lines.append(f"❌ {email}: cookies/ua yo'q")
+            continue
+
+        client = PickClient(
+            host=crane["host"],
+            cookie=cookies,
+            user_agent=ua,
+            captcha_type=crane["captcha_type"],
+            sitekey=crane["sitekey"],
+            api_key=api_key,
+            api_host=api_host
+        )
+
+        result = await asyncio.to_thread(client.claim_hourly)
+        if result.get("success"):
+            num = result.get("num", "?")
+            msg = result.get("msg", "Claim qilindi")
+            log_lines.append(f"✅ {email}: {msg} (num: {num})")
+            crane["claims"] += 1
+            try:
+                dash = await asyncio.to_thread(client.dashboard)
+                crane["balance"] = dash.get("Balance", "0")
+            except:
+                pass
+        else:
+            log_lines.append(f"❌ {email}: {result.get('msg', 'failed')}")
+
+        bonus_result = await asyncio.to_thread(client.claim_bonus)
+        if bonus_result.get("success"):
+            log_lines.append(f"🎁 {email}: bonus {bonus_result.get('msg', '')}")
+            crane["claims"] += 1
+
+        await asyncio.sleep(2)
+
+    LIVE_LOG["crane_emoji"] = crane["emoji"]
+    LIVE_LOG["crane_name"] = crane["name"]
+    LIVE_LOG["log_text"] = "\n".join(log_lines[-5:])
+    if active_accounts:
+        crane["active"] = True
+
+    result_text = get_text("claim_log", log="\n".join(log_lines))
+    await call.message.delete()
+    await call.message.answer(
+        text=result_text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=f"◀️ {crane_name}", callback_data=f"crane_{crane_name}")],
+            [InlineKeyboardButton(text=get_text("main_menu"), callback_data="back_main")],
+        ]),
+        parse_mode="HTML"
+    )
+
+# ─── Add Account (FSM) ──────────────────────────────────────────────────────
 @dp.callback_query(F.data.startswith("add_account_"))
 async def cb_add_account(call: CallbackQuery, state: FSMContext):
-    user_id = call.from_user.id
     crane_name = call.data.replace("add_account_", "")
     crane = get_crane(crane_name)
     if not crane:
-        await call.answer(get_text(user_id, "not_found"), show_alert=True)
+        await call.answer(get_text("not_found"), show_alert=True)
         return
+
     acc_num = len(crane["accounts"]) + 1
     label = f"Account {acc_num}"
     await state.set_state(AddAccount.email)
     await state.update_data(crane_name=crane_name, label=label)
+
     await call.message.delete()
-    await call.message.answer(text=f"{crane['emoji']} <b>{get_text(user_id, 'add_account_title', crane=crane_name)}</b>\n\n{get_text(user_id, 'label', label=label)}\n\n{get_text(user_id, 'send_email')}\n\n{get_text(user_id, 'cancel_abort')}", reply_markup=cancel_keyboard(user_id), parse_mode="HTML")
+    await call.message.answer(
+        text=(
+            f"{crane['emoji']} <b>{get_text('add_account_title', crane=crane_name)}</b>\n\n"
+            f"{get_text('label', label=label)}\n\n"
+            f"{get_text('send_email')}\n\n"
+            f"{get_text('cancel_abort')}"
+        ),
+        reply_markup=cancel_keyboard(),
+        parse_mode="HTML"
+    )
     await call.answer()
 
 @dp.message(AddAccount.email)
 async def fsm_email(message: Message, state: FSMContext):
-    user_id = message.from_user.id
     email = message.text.strip()
     await state.update_data(email=email)
     await state.set_state(AddAccount.password)
-    await message.answer(text=f"{get_text(user_id, 'email_received', email=email)}\n\n{get_text(user_id, 'send_password')}\n\n{get_text(user_id, 'cancel_abort')}", reply_markup=cancel_keyboard(user_id), parse_mode="HTML")
+    await message.answer(
+        text=(
+            f"{get_text('email_received', email=email)}\n\n"
+            f"{get_text('send_password')}\n\n"
+            f"{get_text('cancel_abort')}"
+        ),
+        reply_markup=cancel_keyboard(),
+        parse_mode="HTML"
+    )
 
 @dp.message(AddAccount.password)
 async def fsm_password(message: Message, state: FSMContext):
-    user_id = message.from_user.id
     password = message.text.strip()
     await state.update_data(password=password)
     await state.set_state(AddAccount.cookies)
-    await message.answer(text=f"{get_text(user_id, 'password_ok')}\n\n{get_text(user_id, 'cookies_optional')}\n\n{get_text(user_id, 'cookies_instruction')}\n\n{get_text(user_id, 'cancel_abort')}", reply_markup=cancel_keyboard(user_id), parse_mode="HTML")
+    await message.answer(
+        text=(
+            f"{get_text('password_ok')}\n\n"
+            f"{get_text('cookies_optional')}\n\n"
+            f"{get_text('cookies_instruction')}\n\n"
+            f"{get_text('cancel_abort')}"
+        ),
+        reply_markup=skip_cookies_keyboard(),
+        parse_mode="HTML"
+    )
+
+@dp.callback_query(F.data == "skip_cookies")
+async def cb_skip_cookies(call: CallbackQuery, state: FSMContext):
+    await state.update_data(cookies=None)
+    await state.set_state(AddAccount.ua)
+    await call.message.edit_text(
+        text=(
+            f"{get_text('cookies_skipped')}\n\n"
+            f"{get_text('ua_optional')}\n\n"
+            f"{get_text('ua_instruction')}\n\n"
+            f"{get_text('cancel_abort')}"
+        ),
+        reply_markup=skip_ua_keyboard(),
+        parse_mode="HTML"
+    )
+    await call.answer()
 
 @dp.message(AddAccount.cookies)
 async def fsm_cookies(message: Message, state: FSMContext):
-    user_id = message.from_user.id
     cookies = message.text.strip()
     await state.update_data(cookies=cookies)
     await state.set_state(AddAccount.ua)
-    await message.answer(text=f"{get_text(user_id, 'cookies_received', len=len(cookies))}\n\n{get_text(user_id, 'ua_optional')}\n\n{get_text(user_id, 'ua_instruction')}\n\n{get_text(user_id, 'cancel_abort')}", reply_markup=cancel_keyboard(user_id), parse_mode="HTML")
+    await message.answer(
+        text=(
+            f"{get_text('cookies_received', len=len(cookies))}\n\n"
+            f"{get_text('ua_optional')}\n\n"
+            f"{get_text('ua_instruction')}\n\n"
+            f"{get_text('cancel_abort')}"
+        ),
+        reply_markup=skip_ua_keyboard(),
+        parse_mode="HTML"
+    )
+
+@dp.callback_query(F.data == "skip_ua")
+async def cb_skip_ua(call: CallbackQuery, state: FSMContext):
+    await state.update_data(ua=None)
+    await _finish_add_account(call.message, state)
+    await call.answer()
 
 @dp.message(AddAccount.ua)
 async def fsm_ua(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    ua = message.text.strip()
-    await state.update_data(ua=ua)
+    await state.update_data(ua=message.text.strip())
     await _finish_add_account(message, state)
 
 async def _finish_add_account(message: Message, state: FSMContext):
-    user_id = message.from_user.id
     data = await state.get_data()
     crane_name = data["crane_name"]
     label = data["label"]
@@ -784,362 +815,146 @@ async def _finish_add_account(message: Message, state: FSMContext):
     password = data["password"]
     cookies = data.get("cookies")
     ua = data.get("ua")
+
     crane = get_crane(crane_name)
     if crane is None:
         await state.clear()
         return
+
     crane["accounts"].append({
-        "label": label, "email": email, "password": password,
-        "cookies": cookies, "ua": ua, "active": True
+        "label": label,
+        "email": email,
+        "password": password,
+        "cookies": cookies,
+        "ua": ua,
+        "active": True,
     })
     crane["active"] = True
-    save_cranes()
+
     await state.clear()
     await message.answer(
-        text=f"{get_text(user_id, 'account_added')}\n\n{crane['emoji']} {get_text(user_id, 'account_num', crane=crane_name, num=len(crane['accounts']))}\n📝 {label}\n📧 <code>{email}</code>\n🔑 ✅\n{get_text(user_id, 'cookies_status', status='✅' if cookies else '⏭️')}\n{get_text(user_id, 'ua_status', status='✅' if ua else '⏭️')}",
+        text=(
+            f"{get_text('account_added')}\n\n"
+            f"{crane['emoji']} {get_text('account_num', crane=crane_name, num=len(crane['accounts']))}\n"
+            f"📝 {label}\n"
+            f"📧 <code>{email}</code>\n"
+            f"🔑 ✅\n"
+            f"{get_text('cookies_status', status='✅' if cookies else '⏭️')}\n"
+            f"{get_text('ua_status', status='✅' if ua else '⏭️')}"
+        ),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text=f"◀️ {crane_name}", callback_data=f"crane_{crane_name}")],
-            [InlineKeyboardButton(text=get_text(user_id, "main_menu"), callback_data="back_main")]
+            [InlineKeyboardButton(text=get_text("main_menu"), callback_data="back_main")],
         ]),
         parse_mode="HTML"
     )
 
 @dp.callback_query(F.data == "cancel_add")
 async def cb_cancel_add(call: CallbackQuery, state: FSMContext):
-    user_id = call.from_user.id
     data = await state.get_data()
     crane_name = data.get("crane_name", "")
     await state.clear()
     crane = get_crane(crane_name)
     await call.message.delete()
     if crane:
-        await call.message.answer(text=crane_panel_text(crane, user_id), reply_markup=build_crane_keyboard(crane_name, user_id), parse_mode="HTML")
-    else:
-        await call.message.answer(text=build_message_text(user_id), reply_markup=build_keyboard(user_id), parse_mode="HTML")
-    await call.answer(get_text(user_id, "cancelled"))
-
-@dp.callback_query(F.data.startswith("toggle_"))
-async def cb_toggle_claimer(call: CallbackQuery, state: FSMContext):
-    user_id = call.from_user.id
-    _, crane_name, idx_str = call.data.split("_")
-    idx = int(idx_str)
-    crane = get_crane(crane_name)
-    if not crane or idx >= len(crane.get("accounts", [])):
-        await call.answer(get_text(user_id, "not_found"))
-        return
-
-    account = crane["accounts"][idx]
-    key = f"{user_id}_{crane_name}_{idx}"
-
-    if key in running_claimers and not running_claimers[key].done():
-        running_claimers[key].cancel()
-        del running_claimers[key]
-        await call.answer("⏹️ Claim jarayoni to‘xtatildi.")
-    else:
-        api_key = USER_SETTINGS.get(user_id, {}).get("api_key")
-        if not api_key:
-            await call.answer(get_text(user_id, "api_key_not_set"), show_alert=True)
-            return
-        cookie = account.get("cookies", "")
-        ua = account.get("ua", "")
-        if not cookie or not ua:
-            await call.answer("❌ Cookie yoki User-Agent yo‘q. Iltimos hisobni to‘liq qo‘shing.", show_alert=True)
-            return
-
-        claimer = FaucetClaimer(
-            user_id=user_id,
-            crane_name=crane_name,
-            account_index=idx,
-            cookie=cookie,
-            user_agent=ua,
-            api_key=api_key,
-            bot=bot
+        await call.message.answer(
+            text=crane_panel_text(crane),
+            reply_markup=build_crane_keyboard(crane_name),
+            parse_mode="HTML"
         )
-        task = asyncio.create_task(claimer.run())
-        running_claimers[key] = task
-        await call.answer("▶️ Claim jarayoni boshlandi.")
+    else:
+        await call.message.answer(
+            text=build_message_text(),
+            reply_markup=build_keyboard(),
+            parse_mode="HTML"
+        )
+    await call.answer(get_text("cancelled"))
 
-    # Refresh panel
-    await call.message.edit_text(
-        text=crane_panel_text(crane, user_id),
-        reply_markup=build_crane_keyboard(crane_name, user_id),
-        parse_mode="HTML"
-    )
-
-# ========== SETTINGS ==========
+# ─── Settings ────────────────────────────────────────────────────────────────
 @dp.callback_query(F.data == "settings")
 async def cb_settings(call: CallbackQuery):
-    user_id = call.from_user.id
     await call.message.delete()
-    await call.message.answer(text=build_settings_text(user_id), reply_markup=build_settings_keyboard(user_id), parse_mode="HTML")
+    await call.message.answer(
+        text=build_settings_text(),
+        reply_markup=build_settings_keyboard(),
+        parse_mode="HTML"
+    )
     await call.answer()
 
 @dp.callback_query(F.data == "set_api_key")
 async def cb_set_api_key(call: CallbackQuery, state: FSMContext):
-    user_id = call.from_user.id
     await state.set_state(SettingsState.api_key)
-    await call.message.edit_text(text=get_text(user_id, "api_key_prompt"), reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_settings")]]), parse_mode="HTML")
+    await call.message.edit_text(
+        text=get_text("api_key_prompt"),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=get_text("cancel"), callback_data="cancel_settings")]
+        ]),
+        parse_mode="HTML"
+    )
     await call.answer()
 
 @dp.callback_query(F.data == "set_api_host")
 async def cb_set_api_host(call: CallbackQuery, state: FSMContext):
-    user_id = call.from_user.id
     await state.set_state(SettingsState.api_host)
-    await call.message.edit_text(text=get_text(user_id, "api_host_prompt"), reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_settings")]]), parse_mode="HTML")
+    await call.message.edit_text(
+        text=get_text("api_host_prompt"),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=get_text("cancel"), callback_data="cancel_settings")]
+        ]),
+        parse_mode="HTML"
+    )
     await call.answer()
-
-@dp.callback_query(F.data == "set_language")
-async def cb_set_language(call: CallbackQuery):
-    user_id = call.from_user.id
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🇬🇧 English", callback_data="lang_en")],
-        [InlineKeyboardButton(text="🇺🇿 O'zbek", callback_data="lang_uz")],
-        [InlineKeyboardButton(text="🇷🇺 Русский", callback_data="lang_ru")],
-        [InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="settings")]
-    ])
-    await call.message.edit_text(text=get_text(user_id, "select_language"), reply_markup=keyboard, parse_mode="HTML")
-    await call.answer()
-
-@dp.callback_query(F.data.startswith("lang_"))
-async def cb_language_selected(call: CallbackQuery):
-    user_id = call.from_user.id
-    lang_code = call.data.split("_")[1]
-    if user_id not in USER_SETTINGS:
-        USER_SETTINGS[user_id] = {}
-    USER_SETTINGS[user_id]["language"] = lang_code
-    save_user_settings()
-    await call.message.delete()
-    await call.message.answer(text=build_settings_text(user_id), reply_markup=build_settings_keyboard(user_id), parse_mode="HTML")
-    await call.answer(get_text(user_id, "language_changed"))
 
 @dp.callback_query(F.data == "cancel_settings")
 async def cb_cancel_settings(call: CallbackQuery, state: FSMContext):
-    user_id = call.from_user.id
     await state.clear()
-    await call.message.edit_text(text=build_settings_text(user_id), reply_markup=build_settings_keyboard(user_id), parse_mode="HTML")
-    await call.answer(get_text(user_id, "cancelled"))
+    await call.message.edit_text(
+        text=build_settings_text(),
+        reply_markup=build_settings_keyboard(),
+        parse_mode="HTML"
+    )
+    await call.answer(get_text("cancelled"))
 
 @dp.message(SettingsState.api_key)
 async def fsm_api_key(message: Message, state: FSMContext):
-    user_id = message.from_user.id
     api_key = message.text.strip()
-    if user_id not in USER_SETTINGS:
-        USER_SETTINGS[user_id] = {}
-    USER_SETTINGS[user_id]["api_key"] = api_key
+    MY_SETTINGS["api_key"] = api_key
     API_STATE["connected"] = True
-    save_user_settings()
     await state.clear()
-    await message.answer(text=build_settings_text(user_id), reply_markup=build_settings_keyboard(user_id), parse_mode="HTML")
+    await message.answer(
+        text=build_settings_text(),
+        reply_markup=build_settings_keyboard(),
+        parse_mode="HTML"
+    )
 
 @dp.message(SettingsState.api_host)
 async def fsm_api_host(message: Message, state: FSMContext):
-    user_id = message.from_user.id
     api_host = message.text.strip()
-    if user_id not in USER_SETTINGS:
-        USER_SETTINGS[user_id] = {}
-    USER_SETTINGS[user_id]["api_host"] = api_host
+    MY_SETTINGS["api_host"] = api_host
     API_STATE["domain"] = api_host
-    save_user_settings()
     await state.clear()
-    await message.answer(text=build_settings_text(user_id), reply_markup=build_settings_keyboard(user_id), parse_mode="HTML")
+    await message.answer(
+        text=build_settings_text(),
+        reply_markup=build_settings_keyboard(),
+        parse_mode="HTML"
+    )
 
-# ========== BALANCE & SUBSCRIPTION ==========
+# ─── Boshqa tugmalar (placeholder) ──────────────────────────────────────────
 @dp.callback_query(F.data == "balance")
 async def cb_balance(call: CallbackQuery):
-    user_id = call.from_user.id
-    balance = USER_SETTINGS.get(user_id, {}).get("balance", 0.0)
-    total_deposited = USER_SETTINGS.get(user_id, {}).get("total_deposited", 0.0)
-    total_spent = USER_SETTINGS.get(user_id, {}).get("total_spent", 0.0)
-    text = f"{get_text(user_id, 'balance_title')}\n\n{get_text(user_id, 'current_balance', balance=balance)}\n{get_text(user_id, 'total_deposited', deposited=total_deposited)}\n{get_text(user_id, 'total_spent', spent=total_spent)}\n{get_text(user_id, 'spent_note')}"
-    await call.message.delete()
-    await call.message.answer(text=text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="back_main")]]), parse_mode="HTML")
-    await call.answer()
+    await call.answer("Balans ma'lumotlari tez orada.", show_alert=False)
 
 @dp.callback_query(F.data == "subscription")
 async def cb_subscription(call: CallbackQuery):
-    user_id = call.from_user.id
-    text = f"{get_text(user_id, 'subscription_title')}\n\n{get_text(user_id, 'no_active_sub')}\n\n{get_text(user_id, 'accounts_count')}\n{get_text(user_id, 'claims_count')}\n\n{get_text(user_id, 'available_plans')}\n\n{get_text(user_id, 'monthly')}\n{get_text(user_id, 'monthly_desc')}\n\n{get_text(user_id, 'claim_pack')}\n{get_text(user_id, 'claim_pack_desc')}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    await call.message.delete()
-    await call.message.answer(text=text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=get_text(user_id, "pay_with_crypto"), callback_data="pay_crypto")],
-        [InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="back_main")]
-    ]), parse_mode="HTML")
-    await call.answer()
-
-# ========== PAYMENT (CRYPTO) ==========
-@dp.callback_query(F.data == "pay_crypto")
-async def cb_pay_crypto(call: CallbackQuery):
-    user_id = call.from_user.id
-    text = get_text(user_id, "select_crypto")
-    await call.message.delete()
-    await call.message.answer(text=text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=get_text(user_id, "bnb"), callback_data="pay_bnb")],
-        [InlineKeyboardButton(text=get_text(user_id, "sol"), callback_data="pay_sol")],
-        [InlineKeyboardButton(text=get_text(user_id, "ltc"), callback_data="pay_ltc")],
-        [InlineKeyboardButton(text=get_text(user_id, "ton"), callback_data="pay_ton")],
-        [InlineKeyboardButton(text=get_text(user_id, "trx"), callback_data="pay_trx")],
-        [InlineKeyboardButton(text=get_text(user_id, "doge"), callback_data="pay_doge")],
-        [InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="subscription")]
-    ]), parse_mode="HTML")
-    await call.answer()
-
-@dp.callback_query(F.data.startswith("pay_"))
-async def cb_pay_coin(call: CallbackQuery):
-    user_id = call.from_user.id
-    coin_key = call.data.split("_")[1]
-    if coin_key == "crypto":
-        return
-    coin_map = {"bnb": "BNB (BEP-20)", "sol": "SOL", "ltc": "LTC", "ton": "TON", "trx": "TRX (TRC-20)", "doge": "DOGE"}
-    coin_name = coin_map.get(coin_key, coin_key.upper())
-    wallets = {
-        "bnb": "0x...BNB_ADDRESS_HERE...",
-        "sol": "...SOL_ADDRESS_HERE...",
-        "ltc": "...LTC_ADDRESS_HERE...",
-        "ton": "...TON_ADDRESS_HERE...",
-        "trx": "TXiU2U73Ei9ewcMYu6H1eht5jDGBCUUu1F",
-        "doge": "...DOGE_ADDRESS_HERE..."
-    }
-    address = wallets.get(coin_key, "Address not set")
-    text = f"{coin_name}\n\n{get_text(user_id, 'wallet_address')}\n<code>{address}</code>\n\n{get_text(user_id, 'amounts')}\n{get_text(user_id, 'send_exact')}\n{get_text(user_id, 'submit_txid')}"
-    await call.message.delete()
-    await call.message.answer(text=text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=get_text(user_id, "submit_txid_button"), callback_data="submit_txid")],
-        [InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="pay_crypto")]
-    ]), parse_mode="HTML")
-    await call.answer()
-
-@dp.callback_query(F.data == "submit_txid")
-async def cb_submit_txid(call: CallbackQuery, state: FSMContext):
-    user_id = call.from_user.id
-    await state.clear()
-    await state.set_state(DepositState.amount)
-    PENDING_DEPOSITS[user_id] = {"step": "amount", "amount": None}
-    await call.message.answer(
-        text=get_text(user_id, "enter_amount"),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_deposit")]]),
-        parse_mode="HTML"
-    )
-    await call.answer()
-
-@dp.message(DepositState.amount)
-async def fsm_deposit_amount(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    if not message.text:
-        await message.answer(get_text(user_id, "invalid_amount"))
-        return
-    try:
-        amount = float(message.text.strip().replace(",", "."))
-        if amount < 0.1 or amount > 100:
-            raise ValueError
-    except Exception:
-        await message.answer(get_text(user_id, "invalid_amount"))
-        return
-    PENDING_DEPOSITS[user_id] = {"step": "photo", "amount": amount}
-    await state.set_state(DepositState.txid)
-    await message.answer(
-        text=get_text(user_id, "enter_txid"),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=get_text(user_id, "cancel"), callback_data="cancel_deposit")]]),
-        parse_mode="HTML"
-    )
-
-@dp.message(DepositState.txid)
-async def fsm_deposit_photo(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    if not message.photo:
-        await message.answer(get_text(user_id, "only_photo"))
-        return
-    pending = PENDING_DEPOSITS.get(user_id)
-    amount = pending.get("amount") if pending else None
-    if not amount:
-        await state.clear()
-        PENDING_DEPOSITS.pop(user_id, None)
-        await message.answer("❌ Miqdor topilmadi. Qaytadan boshlang.")
-        return
-    file_id = message.photo[-1].file_id
-    await state.clear()
-    PENDING_DEPOSITS.pop(user_id, None)
-    caption = f"💸 Yangi to'lov so'rovi!\n👤 User ID: <code>{user_id}</code>\n💰 Miqdor: <b>${amount}</b>"
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Tasdiqlash", callback_data=f"approve_deposit_{user_id}_{amount}"),
-         InlineKeyboardButton(text="❌ Rad etish", callback_data=f"reject_deposit_{user_id}")]
-    ])
-    try:
-        await bot.send_photo(chat_id=ADMIN_ID, photo=file_id, caption=caption, reply_markup=keyboard, parse_mode="HTML")
-        await message.answer(get_text(user_id, "txid_received"))
-    except Exception as e:
-        logging.error(f"Deposit error: {e}")
-        await message.answer(f"❌ Xatolik: {e}")
-
-@dp.callback_query(F.data == "cancel_deposit")
-async def cb_cancel_deposit(call: CallbackQuery, state: FSMContext):
-    user_id = call.from_user.id
-    await state.clear()
-    await call.message.delete()
-    await call.message.answer(text=get_text(user_id, "cancelled"), reply_markup=build_keyboard(user_id), parse_mode="HTML")
-    await call.answer()
-
-@dp.callback_query(F.data.startswith("approve_deposit_"))
-async def cb_approve_deposit(call: CallbackQuery):
-    if call.from_user.id != ADMIN_ID:
-        await call.answer("❌ Admin only.", show_alert=True)
-        return
-    parts = call.data.split("_")
-    user_id = int(parts[2])
-    amount = float(parts[3])
-    if user_id not in USER_SETTINGS:
-        await call.answer("User not found", show_alert=True)
-        return
-    USER_SETTINGS[user_id]["balance"] = USER_SETTINGS[user_id].get("balance", 0.0) + amount
-    USER_SETTINGS[user_id]["total_deposited"] = USER_SETTINGS[user_id].get("total_deposited", 0.0) + amount
-    save_user_settings()
-    await bot.send_message(user_id, get_text(user_id, "deposit_approved", amount=amount))
-    await call.message.edit_caption(call.message.caption + "\n\n✅ APPROVED", reply_markup=None)
-    await call.answer("Approved")
-
-@dp.callback_query(F.data.startswith("reject_deposit_"))
-async def cb_reject_deposit(call: CallbackQuery):
-    if call.from_user.id != ADMIN_ID:
-        await call.answer("❌ Admin only.", show_alert=True)
-        return
-    user_id = int(call.data.split("_")[2])
-    await bot.send_message(user_id, get_text(user_id, "deposit_rejected"))
-    await call.message.edit_caption(call.message.caption + "\n\n❌ REJECTED", reply_markup=None)
-    await call.answer("Rejected")
+    await call.answer("Obuna tizimi hozircha ishlamaydi.", show_alert=True)
 
 @dp.callback_query(F.data == "invite")
 async def cb_invite(call: CallbackQuery):
-    user_id = call.from_user.id
-    ref_link = f"https://t.me/{BOT_USERNAME}?start=ref_{user_id}"
-    friends_count = len(USER_SETTINGS.get(user_id, {}).get("referrals", []))
-    bonus = USER_SETTINGS.get(user_id, {}).get("referral_bonus", 0)
-    text = f"{get_text(user_id, 'referral_title')}\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n{get_text(user_id, 'your_link')}\n<code>{ref_link}</code>\n\n{get_text(user_id, 'share_text')}\n\n{get_text(user_id, 'friends_joined', count=friends_count)}\n{get_text(user_id, 'bonus_earned', bonus=bonus)}"
-    await call.message.delete()
-    await call.message.answer(text=text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=get_text(user_id, "share_button"), url=f"https://t.me/share/url?url={ref_link}&text=Join+me%21")],
-        [InlineKeyboardButton(text=get_text(user_id, "back"), callback_data="back_main")]
-    ]), parse_mode="HTML")
-    await call.answer()
+    await call.answer("Referal tizimi hozircha ishlamaydi.", show_alert=True)
 
-# ========== STARTUP & SHUTDOWN ==========
-async def on_startup():
-    global BOT_USERNAME
-    me = await bot.get_me()
-    BOT_USERNAME = me.username
-    await bot.delete_webhook(drop_pending_updates=True)
-
-async def shutdown():
-    for task in running_claimers.values():
-        task.cancel()
-    await asyncio.gather(*running_claimers.values(), return_exceptions=True)
-    save_user_settings()
-    save_cranes()
-
+# ─── Ishga tushirish ─────────────────────────────────────────────────────────
 async def main():
-    await on_startup()
-    try:
-        await dp.start_polling(bot)
-    finally:
-        await shutdown()
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
